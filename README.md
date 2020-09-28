@@ -8,14 +8,14 @@ Access firebird databases with Nim utilizing the new python firebird-driver
 Work in progress ....
 
 Requirements
-===================
+-------------------
 
  - latest Nim , tested mainly against the current devel version
  - python3.8.x
   
 
 Installation
-===================
+-------------------
  - pip install -U firebird-driver
  - nimble install nimcx
  - nimble install nimpy
@@ -23,7 +23,7 @@ Installation
 
 
 Functions Overview
-===================
+-------------------
 
 | procedures                 | description                                                      |         
 |----------------------------|------------------------------------------------------------------|
@@ -39,7 +39,7 @@ Functions Overview
 |  - [x] getSecUsers         | show users registered in security database and sec. plugin       |
 |  - [x] dropDatabase        | drops the database                                               |
 |  - [x] fbBackup            | local backup a databases                                         |
-|  - [x] fbRestore           | local restore a ddatabase from a backup with safety feature      |
+|  - [x] fbRestore           | local restore a database from a backup with safety feature       |
 |  - [x] fbGrant             | grant user rights                                                |
 |  - [x] fbRevoke            | revoke user rights                                               |
 |  - [x] addUser             | add a new user                                                   |
@@ -73,6 +73,7 @@ to do the same thing are still work in progress.
 
 
 The python driver lives here [firebird-driver](https://github.com/FirebirdSQL/python3-driver) 
+
 Read all about it [firebird-driver-documentation](https://firebird-driver.readthedocs.io/en/latest/index.html)
 
 
