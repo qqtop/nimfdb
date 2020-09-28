@@ -11,8 +11,9 @@ nimfdb - a utility to access firebird databases
   - [x] fbdisconnect         disconnect from a database
   - [x] fbquery              execute a query
   - [x] showQuery            raw display of a select query output
-  - [x] showDbInfo           show data a connected database
   - [x] showServerInfo       show data about the firebird server
+  - [x] showDbInfo           show data a connected database
+  - [x] showCursorInfo       show information about a connected select,insert cursor 
   - [x] showTablesAndFields  show available tables and their fields of a connected database
   - [x] showCounts           show row counts of tables in a connected databases         
   - [x] getSecUsers          show users registered in security database and sec. plugin
@@ -21,7 +22,9 @@ nimfdb - a utility to access firebird databases
   - [x] fbRestore            local restore a ddatabase from a backup with safety feature
   - [x] fbGrant              grant user rights
   - [x] fbRevoke             revoke user rights
-  - [x] manageUsers [WIP]    addUser,modifyUser,removeUser,showUsers
+  - [x] addUser              add a new user
+  - [ ] modifyUser           modify a user 
+  - [x] deleteUser           delete a user
   - [x] getRowCount          get row count from a tables
   - [x] getPrimarkeys        returns primarkeys of a connectedion 
   - [x] showAllPrimarykeys   show all primarykeys
@@ -32,7 +35,7 @@ nimfdb - a utility to access firebird databases
   - [x] getViews             fetches views of a databases
   - [x] showAllViews         show all views
   - [x] getUsers             
-  - [x] createFbDatabase
+  - [x] createFbDatabase     
   - [x] createFbTable
   - [x] createFbIndex
   - [x] createGenerator
@@ -44,10 +47,16 @@ nimfdb - a utility to access firebird databases
 
 Most of the main functions work fine , some of the administration functions
 need more testing as the underlying python api is still moving a bit.
+Currently the more conventional functions are implemented , newer ways
+to do the same thing are still work in progress.
 
 
 The python driver can be installed via pip3 install -U firebird-driver
 and lives here [firebird-driver](https://github.com/FirebirdSQL/python3-driver) 
 
+Read all about it [firebird-driver-documentation](https://firebird-driver.readthedocs.io/en/latest/index.html)
+
+
+Sept 2020
 
 
