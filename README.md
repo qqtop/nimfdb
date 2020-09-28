@@ -1,10 +1,29 @@
 # firebird
-access firebird database with Nim via python firebird-driver
 
-Work in progress .... 
 
-a utility in Nim to access firebird databases
-utilizing the official python firebird-driver
+Access firebird databases with Nim utilizing the new python firebird-driver
+
+
+
+Work in progress ....
+
+Requirements
+===================
+
+ - latest Nim , tested mainly against the current devel version
+ - python3.8.x
+  
+
+Installation
+===================
+ - pip install -U firebird-driver
+ - nimble install nimcx
+ - nimble install nimpy
+ - Work in progress ....
+
+
+Functions Overview
+===================
 
 | procedures                 | description                                                      |         
 |----------------------------|------------------------------------------------------------------|
@@ -53,10 +72,9 @@ Currently the more conventional functions are implemented , newer ways
 to do the same thing are still work in progress.
 
 
-The python driver can be installed via pip3 install -U firebird-driver
-and lives here [firebird-driver](https://github.com/FirebirdSQL/python3-driver) 
-
+The python driver lives here [firebird-driver](https://github.com/FirebirdSQL/python3-driver) 
 Read all about it [firebird-driver-documentation](https://firebird-driver.readthedocs.io/en/latest/index.html)
+
 
 
 Sept 2020
