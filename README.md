@@ -6,7 +6,7 @@ Work in progress ....
 a utility in Nim to access firebird databases
 utilizing the official python firebird-driver
          
-------------------------------------------------------------
+----------------------------|------------------------------------------------------------------
   - [x] fbconnect           | connect to a firebird database
   - [x] fbdisconnect        | disconnect from a database
   - [x] fbquery             | execute a query
