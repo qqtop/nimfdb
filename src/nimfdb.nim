@@ -1,13 +1,14 @@
-# #####################################################################################
+# #######################################################################################################
 # Program     : nimfdb.nim  
-# Status      : Development  based on the newest python firebird driver 
-#               https://github.com/FirebirdSQL/python3-driver
+# Status      : Development  
+#               based on and using the newest python firebird driver 
+#               https://github.com/FirebirdSQL/python3-driver via nimpy
 # License     : MIT opensource  
 # Version     : 0.1.0
 # ProjectStart: 2020-05-29
-# Last        : 2020-09-30
+# Last        : 2020-10-01
 # Compiler    : Nim >= 1.3.5  or devel branch
-# Description : Access Firebird databases via python3.8+ from nim
+# Description : Access Firebird databases via python3.8+ from Nim
 #               
 #               Linux only 
 #
@@ -20,9 +21,11 @@
 #               with python3.8.x , all pulled in via nimpy
 #            
 #
-# Tested on   : firebird3.x Superserver 
+# Tested with : firebird3.x Superserver 
 #
-# Requirements: optional zenity for graphical messageboxes etc
+# Requirements: firebird-driver
+#
+#               optional zenity for graphical gtk+ messageboxes etc
 # 
 # Status      : basic functions work - see examples
 #
@@ -38,7 +41,8 @@
 #               this results in output like 2019-08-26 20:35:52+08:00
 #
 #               another way is to use python now.strftime("%Y-%m-%d %H:%M:%S")
-#                python example or frieds formating to return a python string
+#                python example formating to return a python string:
+#
 #                from datetime import datetime
 #                now = datetime.now()
 #                print(now)
@@ -57,69 +61,41 @@
 #
 #               for bulk inserts or updates it is suggested to use execute block functionality
 #               of the firebird server , see fdbE26.nim for an execute block
-#               example which demonstrates fast inserts. But overall this topic
-#               needs to be revisited.
+#               example which demonstrates fast inserts. 
+#               But overall this topic needs to be revisited.
 #
 #               The current commit at the end of fbquery slows bulk insert down
+#               bulk means hundreds or thousands of records. 
 #
-#               fbbackup/fbrestore now works but only localy for now , not over tcp
+#               fbbackup/fbrestore now works localy for now , not over tcp
 #
-#               fbrestore uses gbak so make sure it is in the path
+#               it uses gbak so make sure it is in the path
 #
 #               simple before insert createTrigger and createGenerator capability added
 #
 #               It is important to have the file permissions for the server and database set up correctly
-#               or all kinds of error messages from the python fdb driver may occure . Depending on 
+#               or all kinds of error messages from the python driver may occure . Depending on 
 #               the distro usually a firebird group is available on linux installations and a user
 #               should be part of this group.
-#
-#               In case the firebird-driver was installed into a gitified directory
-#               like eg in /home/someuser/Downloads/python3-driver
-#               just do git pull to update then
-#               python3 setup.py install --user
 #
 #
 #Todo         : More examples
 #               some more functionality like transactions handling 
 #               events,streamblobs,charset conversions,connection and other hooks, 
 #               svc.database.shutdown for single user maintenance mode,nbbackup/restore
-#               other functions from firebird.driver.py 
+#               other functions from firebird-driver. 
 #               
 # 
-# Other       : https://www.ibphoenix.com/files/ConnectionStrings_Fb3.pdf
+#Other       : https://www.ibphoenix.com/files/ConnectionStrings_Fb3.pdf
 #               https://firebird-driver.readthedocs.io/en/latest/getting-started.html
-# #####################################################################################
+#########################################################################################################
  
 import nimcx 
 import nimpy
 export nimpy
 
-#import "~/data5/NimStuff/NimCxDevel/cxzenity.nim"
 import nimcx/cxzenity
-# setup is now for new firebird-driver  , requires python3.8 and up
 
-proc pyversion():string = 
-   ## pyversion
-   ##
-   ## get the python version
-   #
-   var pyv = execCmdEx("python3 -v")
-   var pyvx = pyv.output.splitLines()  # need to get the python version
-   var pyv1 = pyvx[41]
-   var pyv1x = pyv1.replace("Python ","")
-   var pyvs = pyv1x.split(".") 
-   result = "python" & pyvs[0] & "." & pyvs[1]
-   
-var pyversx = pyversion()
-
-# change this line as required if you want to use the showFirebirdPythonDriver proc
-let pathtopythondriver = gethomedir() & ".local/lib/" & pyversx & "/site-packages/firebird"
-
-# we must add the driver path to the python search path if needed
-# this is not required if firebird-driver is installed via pip
-#var sp = pyImport("sys").path
-#for p in [pathtopythondriver]:
-#    discard sp.append(p)
 
 # forward declaration
 proc cleanQdata*(ares:string):string  
@@ -245,16 +221,6 @@ proc parseFdbErrorMsg(fdbErrorMsg:string) =
     printLnErrorMsg(cleanQdata(em1[2]) & " : " & cleanQdata(em13[0]))
     for x in 1..<em13.len:
         printLnErrorMsg(cleanQdata(em13[x]))    
-
-proc showFirebirdPythonDriver*() = 
-      ## showFirebirdPythonDriver
-      ##
-      ## mainly for developer use 
-      ##
-      decho(2)
-      printLnInfoMsg("Firebird",cxpad("Python Driver Information",53),pastelorange)
-      echo()
-      printlnBiCol("Python Firebird Driver : " & pathtopythondriver,xpos=1)
 
 
 proc showServerInfo*(host:string="localhost",user:string="sysdba", password:string = "") =
@@ -961,31 +927,31 @@ proc fbRevoke*(acon:PyObject,username:string,atable:string ,options:string) =
     
     
 proc fbBackup*(database:string,backupfile:string,adminpw:string = "",report:bool=false) =
-   ## fbBackup
-   ##
-   ## Firebird database backup
-   ##
-   ## full path or aliases must be given for database and backupfile
-   ##
-   ## traditionally backupfiles end with .fbk
-   ##
-   ## only basic backup is implemented , for advanced scenarios use gbak directly
-   ##
-   ## this backup is performed via the python based fdb driver
-   ##
-   echo()
-   printLnInfoMsg("Firebird",cxpad("Backup started for  : " & database,50),pastelorange)
-   discard py.exec("""from fdb import services""")
-   discard py.exec("""con = services.connect(password = '$1')""" % adminpw)
-   discard py.exec("""con.backup('$1', '$2', metadata_only=False, collect_garbage=True)""" % [database,backupfile]) 
-   if report == true:
-     discard py.exec("""backup_report = con.readlines()""")
-     printLn("Backup Report for $1 " % database,dodgerblue,xpos=1)
-     discard py.exec("""for rep in backup_report: print(" ",rep) """)
-   discard py.exec("""con.close()""")
-   printLnInfoMsg("Firebird",cxpad("Backup finished for : " & database,50),pastelorange)
-   printLnInfoMsg("Firebird",cxpad("                 to : " & backupfile,50),pastelorange)
-   echo()
+     ## fbBackup
+     ##
+     ## Firebird database backup
+     ##
+     ## full path or aliases must be given for database and backupfile
+     ##
+     ## traditionally backupfiles end with .fbk
+     ##
+     ## only basic backup is implemented , for advanced scenarios use gbak directly
+     ##
+     ## this backup is performed via the python based fdb driver
+     ##
+     echo()
+     printLnInfoMsg("Firebird",cxpad("Backup started for  : " & database,50),pastelyellowgreen)
+     discard py.exec("""from fdb import services""")
+     discard py.exec("""con = services.connect(password = '$1')""" % adminpw)
+     discard py.exec("""con.backup('$1', '$2', metadata_only=False, collect_garbage=True)""" % [database,backupfile]) 
+     if report == true:
+       discard py.exec("""backup_report = con.readlines()""")
+       printLn("Backup Report for $1 " % database,dodgerblue,xpos=1)
+       discard py.exec("""for rep in backup_report: print(" ",rep) """)
+     discard py.exec("""con.close()""")
+     printLnInfoMsg("Firebird",cxpad("Backup ok      from : " & database,50),pastelorange)
+     printLnInfoMsg("Firebird",cxpad("                 to : " & backupfile,50),pastelorange)
+     echo()
 
 proc fbBackupnew*(host:string="localhost",database:string,backupfile:string,adminuser:string="",adminpw:string = "") =
      # WIP as per new api but fails
@@ -994,7 +960,7 @@ proc fbBackupnew*(host:string="localhost",database:string,backupfile:string,admi
      var report = svc.readlines() 
      cxprintLn(1,"Backup Report: ",$report)
      discard svc.close()
-     printLnInfoMsg("Firebird",cxpad("Backup finished for : " & database,50),pastelorange)
+     printLnInfoMsg("Firebird",cxpad("Backup ok      from : " & database,50),pastelorange)
      printLnInfoMsg("Firebird",cxpad("                 to : " & backupfile,50),pastelorange)
      echo()
      
@@ -1022,7 +988,7 @@ proc fbRestore*(backupfile:string,database:string,adminpw:string="",replace:bool
      var restorestring = ""
      var ov = "No"
      
-     printLnInfoMsg("Firebird",cxpad("GBAK Restore started for " & database,50),pastelorange)
+     printLnInfoMsg("Firebird",cxpad("Restore started for " & database,50),pastelyellowgreen)
      if replace == false:
          # this will throw an error if database already exists
          #restorestring = "gbak -c $1  $2 -V" % [backupfile,database]  # verbose
@@ -1030,7 +996,6 @@ proc fbRestore*(backupfile:string,database:string,adminpw:string="",replace:bool
      else:
          # this will overwrite existing database so we ask for agreement
          if fileExists(database):
-             echo()
              var yn = cxZYesNo("Replace File : $1 " % database) 
              if $yn == "yes":
                   #restorestring = "gbak -c $1  $2 -REP -V" % [backupfile,database] # verbose
@@ -1053,8 +1018,8 @@ proc fbRestore*(backupfile:string,database:string,adminpw:string="",replace:bool
          for line in restoreres.output.splitLines():                 
             cxprintLn(1,dodgerblue,line)
         if restoreres.exitCode == 0:
-            printLnInfoMsg("Firebird",cxpad("Restore finished to : " & database ,50),pastelorange)
-            printLnInfoMsg("Firebird",cxpad("               from : " & backupfile,50),pastelorange)
+            printLnInfoMsg("Firebird",cxpad("Restored       from : " & backupfile ,50),pastelorange)
+            printLnInfoMsg("Firebird",cxpad("                 to : " & database,50),pastelorange)
         else:
             printLnInfoMsg("Firebird",cxpad("Check output . gbak exitcode : " & $(restoreres.exitCode),50),truetomato)
      else:
@@ -1100,9 +1065,7 @@ when isMainModule:
     #remote connection path example to some database on a remote server ok
     #let testdb = "192.168.1.109/3050:/home/mint-tux/Downloads/python3-driver/test/fbtest30.fdb" 
       
-    # show path of python driver 
-    showFirebirdPythonDriver()
-    
+  
     # show serverinfo
     showServerInfo(password=pwx)
     
@@ -1192,7 +1155,7 @@ when isMainModule:
         printLnFailMsg("Connection has closed and is not available anymore as it should be")
         discard
        
-        
+    echo()    
     cxprintLn(1,plum,"Trying to run a backup/restore via gbak   ")
     
     # backup with new api still fails 
