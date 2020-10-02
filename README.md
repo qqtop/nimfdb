@@ -1,17 +1,22 @@
-# firebird
+# nimfdb   -  Firebird
 
 
 Access firebird databases with Nim utilizing the new python firebird-driver
 
 
+Work in progress .... tested on Linux only
 
-Work in progress ....
 
 Requirements
 -------------------
 
  - latest Nim , tested mainly against the current devel version
  - python3.8.x
+ 
+Notes 
+------------------- 
+ - our test database has abt 7 million rows of [tatoeba](https://tatoeba.org/eng/) sentences
+   and selects translations via the tatoeba links table with abt 17 million rows.
   
 
 Installation
@@ -19,13 +24,13 @@ Installation
  - pip install -U firebird-driver
  - nimble install nimcx
  - nimble install nimpy
- - Work in progress ....
+ - nimble install https://github.com/qqtop/nimfdb 
 
 
 Functions Overview
 -------------------
 
-| procedures                 | description                                                      |         
+| procedures                 | description                                                      | 
 |----------------------------|------------------------------------------------------------------|
 |  - [x] fbconnect           | connect to a firebird database                                   |
 |  - [x] fbdisconnect        | disconnect from a database                                       |
@@ -63,25 +68,41 @@ Functions Overview
 |  - [x] getODS              |                                                                  |
 |  - [x] cleanQData          | clean up query output from python artifacts                      |
 |  - [x] fbConStatus         | shows connection status                                          |
-|  - [x] utility functions   | to parse python output |                                         |
+|  - [x] utility functions   | to parse python output                                           |
+|  - [ ] transactions        | transaction handling                                             |
+|  - [ ] events              | database event handling                                          |
+|  - [ ] statistics          | database statistics reporting                                    |
+|  - [ ] logging             | database logging                                                 |
+|  - [ ] nbackup             | nbackup handling                                                 |
+|  - [ ] nrestore            | nrestore handling                                                |
+|  - [ ] shadow              | database shadowing                                               |
+|  - [ ] sweep               | sweep handling                                                   |
+|  - [ ] repair              | database repair handling                                         |
+|  - [ ] streamblobs         | streamblobs handling                                             |
+|  - [ ] hooks management    | database hooks handling                                          |
+|  - [ ] timezone            | timezone handling    fb4                                         |
+|  - [ ] charsetconversion   | character set handling                                           |
+
 
 
 Most of the main functions work fine , some of the administration functions
 need more testing as the underlying python api is still moving a bit.
-Currently the more conventional functions are implemented , newer ways
-to do the same thing are still work in progress.
+
+Currently the conventional usage functions are implemented , newer ways
+to do the same thing are still work in progress and will be tested once 
+firebird4 is stable.
 
 
 The python driver lives here [firebird-driver](https://github.com/FirebirdSQL/python3-driver) 
 
 Read all about it [firebird-driver-documentation](https://firebird-driver.readthedocs.io/en/latest/index.html)
 
-
+The [Firebird Project](https://www.firebirdsql.org/en/start/)
 
 
 
 ![Image](http://qqtop.github.io/qqtop1.png?raw=true)
 
-Sept 2020
+Oct 2020
 
 
