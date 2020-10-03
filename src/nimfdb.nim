@@ -32,7 +32,7 @@
 #               
 #               fdbE27.nim for testing and usage
 #
-#               nimfdb.nim also has a main module used for testing  
+#               nimfdb.nim also has a main module which can be used for testing  
 #
 # Note        : default char set for createDatabase is UTF8
 #
@@ -76,7 +76,7 @@
 #               It is important to have the file permissions for the server and database set up correctly
 #               or all kinds of error messages from the python driver may occure . Depending on 
 #               the distro usually a firebird group is available on linux installations and a user
-#               should be part of this group.
+#               should be part of this group. Do something like chown firebird /db/new1.fdb
 #
 #
 #Todo         : More examples
@@ -877,9 +877,20 @@ proc modifyUser*(host:string="localhost",
              firstname:string="",
              middlename:string="",
              lastname:string="") =
-             
-     printLnInfoMsg("Firebird","Modify user function not yet implemented",truetomato)
-     echo()        
+      
+      
+     let svc = fdb.connect_server(host,user=adminuser, password=adminpw)
+     var checkuser = svc.user.get(username) 
+
+     #echo "--modify--> ",checkuser  
+     if ($checkuser).strip() == "None" : 
+          printLnInfoMsg("[Firebird]",cxpad("User : " & username & " does not exist.",50),truetomato)     
+     else:
+          discard   svc.user.update(username, first_name=firstname, middle_name=middlename, last_name=lastname,password=userpassword)        
+          printLnInfoMsg("Firebird",cxpad("Modified user : " & username,50),pastelorange)
+            
+     discard svc.close()   
+     echo()      
               
               
 proc fbGrant*(acon:PyObject,username:string,atable:string ,options:string) =
@@ -964,6 +975,57 @@ proc fbBackupnew*(host:string="localhost",database:string,backupfile:string,admi
      printLnInfoMsg("Firebird",cxpad("                 to : " & backupfile,50),pastelorange)
      echo()
      
+proc fbBackupRemoteToLocal*(host:string,database:string,backupfile:string,adminpw:string = "") =
+     ## fbBackupRemoteToLocal    WIP
+     ##
+     ## fast backup a remote database to a local directory
+     ##
+     ## existing local backupfile will be overwritten
+     ##
+     ## eg:
+     ##
+     ## fbBackupRemoteToLocal("192.168.1.123",myadminpass,"myremotepath/test.fdb","mylocalpath/test.fbk")
+     ##
+     echo()
+     printLnInfoMsg("Firebird",cxpad("Backup started for  : " & database,50),pastelyellowgreen)
+     var bk = execCmdEx("""gbak -b -se $1:service_mgr -user SYSDBA -pass $2  $3 stdout > $4""" % [host,adminpw,database,backupfile])
+     if $(bk.exitcode) == "0":
+        printLnInfoMsg("Backup","gbak backup status ok",pastelorange)
+        printLnInfoMsg("Backup","Backupfile is : $1" % ["/home/lxuser/Downloads/ubuntunotes.fbk"],pastelorange) 
+        
+     
+proc fbRestoreLocalToRemote*(host:string,database:string,backupfile:string,adminpw:string = "")=
+     ## fbRestoreLocalRemote      WIP
+     ##
+     ## fast restore from local backupfile to remote destination
+     ##
+     ## existing remote fdb file will not be overwritten
+     ##
+     ## a new file with ending -restored.fdb will be created for 
+     ##
+     ## manual renaming for security reasons. If a -restored.fdb file
+     ##
+     ## exists on remote server then the restore will fail.
+     ##
+     ## eg:
+     ##
+     ## fbRestoreLocalToRemote("192.168.1.123",myadminpass,"myremotepath/test.fdb","mylocalpath/test.fbk")
+     ##   
+     var database = database  # make a copy of the string
+     if database.endswith("-restored.fdb") == false:
+         # we need to change the database name in order not to overwrite the file on the remoteserver
+         if database.endswith(".fdb") == true:
+             database.removeSuffix(".fdb")
+             database = database & "-restored.fdb" # correct to the new name for our to be restored database
+             
+     printLnInfoMsg("Firebird",cxpad("Restore started for : " & database,50),pastelyellowgreen)
+     var rs = execCmdEx("""gbak -c -se $1:service_mgr -user SYSDBA -pass $2 stdin $3 < $4"""  % [host,adminpw,database,backupfile])
+     if $(rs.exitcode) == "0":
+        printLnInfoMsg("Restore","gbak restore status ok",pastelorange)
+        printLnInfoMsg("Restore","Restored to $1" % [database],pastelorange)  
+     else: 
+        printLnInfoMsg("Restore","gbak restore status fail",truetomato)
+ 
       
 proc fbRestore*(backupfile:string,database:string,adminpw:string="",replace:bool = false,report:bool=false) =
      ## fbRestore
@@ -988,7 +1050,7 @@ proc fbRestore*(backupfile:string,database:string,adminpw:string="",replace:bool
      var restorestring = ""
      var ov = "No"
      
-     printLnInfoMsg("Firebird",cxpad("Restore started for " & database,50),pastelyellowgreen)
+     printLnInfoMsg("Firebird",cxpad("Restore started for : " & database,50),pastelyellowgreen)
      if replace == false:
          # this will throw an error if database already exists
          #restorestring = "gbak -c $1  $2 -V" % [backupfile,database]  # verbose
@@ -996,7 +1058,7 @@ proc fbRestore*(backupfile:string,database:string,adminpw:string="",replace:bool
      else:
          # this will overwrite existing database so we ask for agreement
          if fileExists(database):
-             var yn = cxZYesNo("Replace File : $1 " % database) 
+             var yn = cxZYesNo("Replace existing file :\L\L$1 " % database) # a zenity messagebox
              if $yn == "yes":
                   #restorestring = "gbak -c $1  $2 -REP -V" % [backupfile,database] # verbose
                   restorestring = "gbak -c $1  $2 -REP" % [backupfile,database]
@@ -1005,7 +1067,6 @@ proc fbRestore*(backupfile:string,database:string,adminpw:string="",replace:bool
                   printLnInfoMsg("Firebird",cxpad("Nothing will be restored",50),truetomato)
          else:
              #if databasefile is not existing we simply restore
-             #restorestring = "gbak -c $1  $2 -V" % [backupfile, database] # verbose
              #restorestring = "gbak -c $1  $2 -V" % [backupfile, database] # verbose
              restorestring = "gbak -c $1  $2" % [backupfile, database]
                               
@@ -1050,11 +1111,16 @@ proc dropDatabase*(database:string,auser:string,auserpw:string) =
 when isMainModule:
     
     # some quick testing for various functions
+    # run this only with a user who has admin rights , like sysdba
+    # other users will need to have relevant roles granted to them 
+    # to run successfully.
     # the fbtest30.fdb is part of the python driver test suite
-    # setup
-    let pwx = getPwd()  # get the password via cxzenity first
-    let user = "sysdba" # set the initial user
     
+    # setup
+    let logon = cxZLoginDialog()  # get the user/password via cxzenity first
+    let user = logon.name          
+    let pwx = logon.password      
+        
     #below ok  change to wherever the fbtest30.fdb file lives
     #note that permissions must be correct so usually you want
     #to have the .fdb files be part of the firebird group
@@ -1063,19 +1129,21 @@ when isMainModule:
     let testdbflocal = getHomeDir() & "Downloads/python3-driver/test/fbtest30.fdb"
     
     #remote connection path example to some database on a remote server ok
-    #let testdb = "192.168.1.109/3050:/home/mint-tux/Downloads/python3-driver/test/fbtest30.fdb" 
-      
-  
+    #let testdb = "192.168.1.109/3050:/home/blaah/Downloads/python3-driver/test/fbtest30.fdb" 
+
     # show serverinfo
-    showServerInfo(password=pwx)
-    
+    showServerInfo(password=pwx)  # will crash if the user has no admin rights
+        
     var acon = fbconnect(dsn=testdb,user=user,pw=pwx)
     echo()
     
     cxprintln(0,plum,"Show information based on connection to a database")
     showDbinfo(acon)
     showTablesAndFields(acon)
-    showCounts(acon)  # will fail if user has not full permissions , ok with sysdba user
+    try:
+      showCounts(acon)  # will fail if user has no admin rights , ok with sysdba user
+    except:
+      discard    
     echo()
     
     cxprintln(0,plum,"Query output")
@@ -1137,12 +1205,13 @@ when isMainModule:
     
     deleteUser(adminpw=pwx,username="JOHN2020")
     
+    modifyUser(adminpw=pwx,username="JOHN4",firstname="FrankyBoy",userpassword="johnny")
+    
     cxprintLn(1,plum,"Current Users Full Details after delete:")
     getusers(password = pwx)
     echo()
        
     cxprintLn(1,peru,"End of user manipulation test")   
-       
        
     cxprintLn(1,plum,"Disconnection Information ")
     printLnBiCol(" Fbdisconnect  : " & $fbdisconnect(acon) & "  [ should be true ]")
@@ -1158,10 +1227,7 @@ when isMainModule:
     echo()    
     cxprintLn(1,plum,"Trying to run a backup/restore via gbak   ")
     
-    # backup with new api still fails 
-    #fbBackupNew("localhost",testdbflocal,getHomeDir() & "Downloads/python3-driver/test/fbtest30.fbk","sysdba",pwx)      
-        
-    # old local backup/restore ok
+    # fbbackup/fbrestore ok
     fbBackup(testdbflocal,getHomeDir() & "Downloads/python3-driver/test/fbtest30.fbk",pwx) 
         
     # restoring with rep switch is true so a older restore will be replaced  ok
@@ -1186,7 +1252,7 @@ when isMainModule:
       
     # shutdown all again
     cxprintLn(0,plum,"Disconnection Information ")
-    printLnBiCol(" Fbdisconnected : " & $fbdisconnect(acon) & "  [ should be true ]")
+    printLnBiCol(" Disconnected   : " & $fbdisconnect(acon) & "  [ should be true ]")
     printLnBiCol(" ConnectedFlag  : " & $connectedflag & " [ should be false ]")
     echo()
     

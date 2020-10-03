@@ -1,7 +1,7 @@
 # nimfdb   -  Firebird
 
 
-Access firebird databases with Nim utilizing the new python firebird-driver
+Access Firebird databases with Nim utilizing the new python firebird-driver
 
 
 Work in progress .... tested on Linux only
@@ -12,20 +12,21 @@ Requirements
 
  - latest Nim , tested mainly against the current devel version
  - python3.8.x
+ - a Firebird server installation from your distro
  
 Notes 
 ------------------- 
- - our test database has abt 7 million rows of [tatoeba](https://tatoeba.org/eng/) sentences
+ - our test firebird database has abt 7 million rows of [tatoeba](https://tatoeba.org/eng/) sentences
    and selects translations via the tatoeba links table with abt 17 million rows.
   
 
 Installation
 -------------------
- - pip install -U firebird-driver
+ - pip install firebird-driver
  - nimble install nimcx
  - nimble install nimpy
  - nimble install https://github.com/qqtop/nimfdb 
-
+ 
 
 Functions Overview
 -------------------
@@ -71,6 +72,7 @@ Functions Overview
 |  - [x] utility functions   | to parse python output                                           |
 |  - [ ] transactions        | transaction handling                                             |
 |  - [ ] events              | database event handling                                          |
+|  - [ ] procedures          | sql procedure handling                                           |
 |  - [ ] statistics          | database statistics reporting                                    |
 |  - [ ] logging             | database logging                                                 |
 |  - [ ] nbackup             | nbackup handling                                                 |
@@ -85,19 +87,20 @@ Functions Overview
 
 
 
-Most of the main functions work fine , some of the administration functions
-need more testing as the underlying python api is still moving a bit.
-
-Currently the conventional usage functions are implemented , newer ways
-to do the same thing are still work in progress and will be tested once 
-firebird4 is stable.
-
+Main functions work fine , some of the administration functions
+need more testing as the underlying python api is still in flux.
+Advanced management utilities need more testing .
+Connections via embedded or tcp work fine .
 
 The python driver lives here [firebird-driver](https://github.com/FirebirdSQL/python3-driver) 
 
-Read all about it [firebird-driver-documentation](https://firebird-driver.readthedocs.io/en/latest/index.html)
+Read the [firebird-driver-documentation](https://firebird-driver.readthedocs.io/en/latest/index.html)
 
-The [Firebird Project](https://www.firebirdsql.org/en/start/)
+Read latest wisdom about [Backup/Restore ](https://ib-aid.com/articles/firebird-gbak-backup-tips-and-tricks)
+
+For intensive administration use [Flamerobin](https://github.com/mariuz/flamerobin) 
+
+Learn about the [Firebird Project](https://www.firebirdsql.org/en/start/)
 
 
 
