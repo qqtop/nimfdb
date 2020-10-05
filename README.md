@@ -60,19 +60,20 @@ Functions Overview
 |  - [x] showAllGenerators   | show all generators                                              |
 |  - [x] getViews            | fetches views of a databases                                     |
 |  - [x] showAllViews        | show all views                                                   |
-|  - [x] getUsers            |                                                                  |
-|  - [x] createFbDatabase    |                                                                  |
-|  - [x] createFbTable       |                                                                  |
-|  - [x] createFbIndex       |                                                                  |
-|  - [x] createGenerator     |                                                                  |
-|  - [x] createTrigger       |                                                                  |
-|  - [x] getODS              |                                                                  |
+|  - [x] getUsers            | registered users                                                 |
+|  - [x] createFbDatabase    | database creation                                                |
+|  - [x] createFbTable       | table creation                                                   |
+|  - [x] createFbIndex       | index creation                                                   |
+|  - [x] createGenerator     | generator creation                                               |
+|  - [x] createTrigger       | trigger creation                                                 |
+|  - [x] getODS              | ods version information                                          |
 |  - [x] cleanQData          | clean up query output from python artifacts                      |
 |  - [x] fbConStatus         | shows connection status                                          |
 |  - [x] utility functions   | to parse python output                                           |
 |  - [ ] transactions        | transaction handling                                             |
 |  - [ ] events              | database event handling                                          |
 |  - [ ] procedures          | sql procedure handling                                           |
+|  - [ ] scrollableCursor    | scrollable cursor functions                                      |
 |  - [ ] statistics          | database statistics reporting                                    |
 |  - [ ] logging             | database logging                                                 |
 |  - [ ] nbackup             | nbackup handling                                                 |
@@ -84,6 +85,7 @@ Functions Overview
 |  - [ ] hooks management    | database hooks handling                                          |
 |  - [ ] timezone            | timezone handling    fb4                                         |
 |  - [ ] charsetconversion   | character set handling                                           |
+|  - [ ] examples            | more examples .....                                              |
 
 
 

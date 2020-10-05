@@ -6,7 +6,7 @@
 # License     : MIT opensource  
 # Version     : 0.1.0
 # ProjectStart: 2020-05-29
-# Last        : 2020-10-01
+# Last        : 2020-10-05
 # Compiler    : Nim >= 1.3.5  or devel branch
 # Description : Access Firebird databases via python3.8+ from Nim
 #               
@@ -16,7 +16,7 @@
 #
 #               requires python firebird-driver installed via
 #               
-#               python pip install -U firebird-driver
+#               python pip install firebird-driver
 #
 #               with python3.8.x , all pulled in via nimpy
 #            
@@ -25,23 +25,19 @@
 #
 # Requirements: firebird-driver
 #
-#               optional zenity for graphical gtk+ messageboxes etc
+#               zenity for graphical gtk+ messageboxes etc
 # 
 # Status      : basic functions work - see examples
-#
-#               
-#               fdbE27.nim for testing and usage
-#
-#               nimfdb.nim also has a main module which can be used for testing  
+#  
 #
 # Note        : default char set for createDatabase is UTF8
 #
-#               for datetime fields it is better to use varchar and fill them
+#               for datetime fields it may be better to use varchar and fill them
 #               with something like:  let mydatetime = quoteshellposix(cxnow()) 
 #               this results in output like 2019-08-26 20:35:52+08:00
 #
 #               another way is to use python now.strftime("%Y-%m-%d %H:%M:%S")
-#                python example formating to return a python string:
+#               python example formating to return a python string  :
 #
 #                from datetime import datetime
 #                now = datetime.now()
@@ -54,9 +50,8 @@
 #                print(today)
 #                print(today.strftime("%Y-%m-%d %H:%M:%S"))
 #                print(today.strftime("%Y-%m-%d %H:%M:%S.%f"))
-#            
-#               
-#               This may change with firebird 4 as there will be timestamp with timezone 
+#                          
+#               This will change with firebird4 as there will be timestamp with timezone 
 #               fields and other improvements so above is a temporary solution
 #
 #               for bulk inserts or updates it is suggested to use execute block functionality
@@ -67,11 +62,11 @@
 #               The current commit at the end of fbquery slows bulk insert down
 #               bulk means hundreds or thousands of records. 
 #
-#               fbbackup/fbrestore now works localy for now , not over tcp
-#
 #               it uses gbak so make sure it is in the path
 #
-#               simple before insert createTrigger and createGenerator capability added
+#               nimfdb.nim also has a main module which can be used for testing
+#               the required database can be found here 
+#               https://github.com/FirebirdSQL/python3-driver/tree/master/test 
 #
 #               It is important to have the file permissions for the server and database set up correctly
 #               or all kinds of error messages from the python driver may occure . Depending on 
@@ -87,13 +82,12 @@
 #               
 # 
 #Other       : https://www.ibphoenix.com/files/ConnectionStrings_Fb3.pdf
-#               https://firebird-driver.readthedocs.io/en/latest/getting-started.html
+#              https://firebird-driver.readthedocs.io/en/latest/getting-started.html
 #########################################################################################################
  
 import nimcx 
 import nimpy
 export nimpy
-
 import nimcx/cxzenity
 
 
@@ -101,7 +95,7 @@ import nimcx/cxzenity
 proc cleanQdata*(ares:string):string  
 proc fbGrant*(acon:PyObject,username:string,atable:string ,options:string)
 
-#required pyimports
+#required python imports
 let fdb* = pyImport("""firebird.driver""")  # import the actual python driver here
 let fdbase* = pyImport("""firebird.base""") # import the driver base in case its needed 
 let datetime* = pyImport("datetime")        # import the python datetime module
@@ -110,9 +104,12 @@ let pysys* = pyImport("sys")                # import the python driver sys modul
 let pyvers* = pysys.version                 # answers what python is in use question
 let py* = pyBuiltinsModule()                # imports the python buildins
 let os* = pyImport("os")
+
+
 var connectedflag*:bool = false             # global to indicate connection status
 
 # utility firebird query strings
+
 let odsversion* = "SELECT RDB$GET_CONTEXT('SYSTEM','ENGINE_VERSION') FROM RDB$DATABASE"
 # query to get isolation level of a connection
 let isolevel* = "SELECT RDB$GET_CONTEXT('SYSTEM', 'ISOLATION_LEVEL') FROM RDB$DATABASE"
@@ -141,11 +138,14 @@ BEGIN
 END
 """
 
+   
+
+
 template fbConStatus*(acon:PyObject,aconName:string) =
     ## fbConStatus
     ##
     ## display status of a connection assuming connection is called fbacon
-    ## call like so : fbConStatus(fbacon,"fbacon")
+    ## call like so : fbacon.fbConStatus("fbacon")  aconName can also be the databasename
     ##
     echo()
     cxprintLn(1,plum,"Connection : ",white, aconName)
@@ -154,7 +154,6 @@ template fbConStatus*(acon:PyObject,aconName:string) =
     else:
          printLnBiCol("Status     : Connected",colLeft=plum,colRight=cyan,xpos=1)    
     echo()
-
 
 proc parseCxDatetime*(datestring: PyObject): string {.exportpy.} = 
     ## parseCxDatetime
@@ -212,7 +211,7 @@ proc parseQrow*(dt:string,sep:string=","):string =
          
   
 proc parseFdbErrorMsg(fdbErrorMsg:string) =
-    # here we attempt to parse the errormsg returned from the python fdb driver
+    # here we attempt to parse the errormsg returned from the python driver
     let em1 = fdbErrorMsg.split(":")
     let em11 = em1[0].replace("<class '","").replace("'>","")
     printLnErrorMsg(em11)
@@ -234,6 +233,8 @@ proc showServerInfo*(host:string="localhost",user:string="sysdba", password:stri
      let svc = fdb.connect_server(host,user=user, password = password)
      printLnBiCol(" Firebird Arch.    : " & $svc.info.architecture)
      printLnBicol(" Firebird Version  : " & $svc.info.version)
+     printLnBiCol(" Manager Version   : " & $svc.info.manager_version)
+     printLnBicol(" Srv. Capabilities : " & $svc.info.capabilities)
      printLnBiCol(" Security Database : " & $svc.info.security_database)   
      printLnBiCol(" Home Directory    : " & $svc.info.home_directory)
      printLnBiCol(" Connection Count  : " & $svc.info.connection_count)
@@ -270,7 +271,7 @@ proc showDbInfo*(acon:PyObject) =
      printLnBiCol(" Encrypted          : " & $(acon.info.is_encrypted()))  
      echo()
      
-proc fbConnect*(dsn,user,pw:string,fail:bool=true):PyObject = 
+proc fbConnect*(dsn,user,pw:string,role:string="",fail:bool=true):PyObject = 
           ## fbconnect
           ## 
           ## connect to a database with dsn,user and passwd
@@ -287,12 +288,14 @@ proc fbConnect*(dsn,user,pw:string,fail:bool=true):PyObject =
           ##
           ## if connection cannot be established the program quits.
           ##
+          ## for role see firebird documentation
+          ##
           ## If fail is set to false one can iterate and try several 
           ##
           ## connection strings without quitting on connection failure.
           ## 
           try:          
-            result = fdb.connect(dsn,user=user,password=pw) # note syntax for the driver
+            result = fdb.connect(dsn,user=user,password=pw,role=role) 
             connectedflag = true
           except:
             echo()
@@ -306,26 +309,23 @@ proc fbConnect*(dsn,user,pw:string,fail:bool=true):PyObject =
             #parseFdbErrorMsg(getCurrentExceptionMsg())
             echo()
             if fail == true:  # this is the default setting, if fail = false we can skip
-                              # a failing connection and maybe try another one
-              doFinish()
+                doFinish()    # a failing connection and maybe try another one
+              
             
             
-proc fbdisconnect*(acon:PyObject):bool =
+proc fbdisconnect*(acon:PyObject) =
       # fbdisconnect 
       #
       # trying to close the connection
       try:
          #discard acon.commit() # cannot put this here or we do not close
          discard acon.close() 
-         result = true
          connectedflag=false
       except:
-         # if we come here a python error is bubbled trough
+         # if we come here a python error is bubbled up
          # Error: unhandled exception: <class 'AssertionError'>:  [AssertionDefect]
          # to see this compile with -d:debug
-         result = false  
-         connectedflag = true                
-         #raise    
+         connectedflag = true         # that is disconnect failed       
          discard
  
 proc queryFields*(qstring:string):int =
@@ -352,7 +352,7 @@ proc queryFields*(qstring:string):int =
             #for x in z2: echo x
             result = z2.len             
      else:
-           printLnInfoMsg("Firebird","Not a select query string . Queryfieldscount not established",truetomato) 
+           printLnInfoMsg("Firebird","Not a select query ! Queryfieldscount not established",truetomato) 
            result = -1
                
                        
@@ -369,7 +369,7 @@ proc fbquery*(acon:PyObject,qstring:string,raiseflag:bool = false):seq[string] {
              result = okres                        
           else :
              try:
-                 discard acon.execute_immediate(qstring) # no result set like insert update create etc
+                 discard acon.execute_immediate(qstring) # no result set eg. insert update create etc
              except:          
                  printLnInfoMsg("Firebird","Error raised in fbquery with: " & qstring ,truetomato)
                  printLnInfoMsg("Firebird",getCurrentExceptionMsg(),truetomato) 
@@ -378,12 +378,11 @@ proc fbquery*(acon:PyObject,qstring:string,raiseflag:bool = false):seq[string] {
                  else:
                     discard      
 
-          discard acon.commit() # TODO: this would be slow for bulk inserts , 
+          discard acon.commit() # TODO: this is slow for bulk inserts , 
                                 # check fb docu for bulk insert best praxis execute block etc
-                                # see example for EXECUTE BLOCK in fdbE26.nim for fast insert
+                                # see example for EXECUTE BLOCK for faster insert
                                 
-          # note: cannot close connection here due to python errors popping up
-                                
+                                          
 proc cleanQdata*(ares:string):string =     
          # cleans most artifacts returned from the query executed in python
          # some may still resist though , change if your requirements are different
@@ -431,7 +430,7 @@ proc showQuery*(okres:seq[string],printit:bool = true):seq[string] {.discardable
        echo()
                        
 
-proc createFbDatabase*(dsn:string,auser:string,apassword:string,charset:string="UTF8") = 
+proc createFbDatabase*(dsn:string,auser:string,apassword:string,charset:string="UTF8",overwrite:bool=false) = 
     ## createFbDatabase
     ## 
     ## Checks if database exists , if not it will be created with given parameters
@@ -443,25 +442,23 @@ proc createFbDatabase*(dsn:string,auser:string,apassword:string,charset:string="
         
     try:
       # to check if database exists we just connect and close ,
-      # in case of fails here fdb driver errors will be shown
-      var acon = fdb.connect(dsn, user = auser, password = apassword)
-      discard fbdisconnect(acon) 
-      printLnInfoMsg("Firebird","Database " & dsn & " exists . Creation command failed.",truetomato)
+      # in case of fails here firebird-driver errors will be shown
+      if overwrite == false:
+        var acon = fdb.connect(dsn, user = auser, password = apassword)
+        fbdisconnect(acon) 
+        printLnInfoMsg("Firebird","Database " & dsn & " exists . Creation command failed.",truetomato)
+        printLnInfoMsg("Firebird","To overwrite try to create with parameter overwrite = true.",pastelorange)
       echo()
     except:
       printLnStatusMsg("Database does not exist we try to create. ")
-      
-      var acondb = fdb.create_database(#host=host,
-                                     database = dsn,
+      var acondb = fdb.create_database(database = dsn,
                                      user = auser,
                                      password = apassword,
                                      charset = charset)  
                                                                          
-      #another way to write this                           
-      #var acon = fdb.create_database("create database '$1' user '$2' password '$3' DEFAULT CHARACTER SET UTF8" % [dsn,auser,apassword])
       printLnInfoMsg("Firebird", cxPad(dsn & " database created  ",40),pastelPink)
-      discard fbdisconnect(acondb)  
-      fbConStatus(acondb,"acondb")
+      fbdisconnect(acondb)  
+      acondb.fbConStatus("acondb")
       echo()
       #testing if re-connection can be established promptly
       #var acon = fdb.connect(database, user = auser, password = apassword)
@@ -611,7 +608,7 @@ proc getSecUsers*(acon:PyObject):string =
      ## displays usernames and relative security plugin
      ##   
      result = "\n" & spaces(6) # indent the returned multiline string 
-     let aix = fbquery(acon,"select SEC$USER_NAME, SEC$PLUGIN from sec$users")
+     let aix = fbquery(acon,"select SEC$USER_NAME,SEC$PLUGIN from sec$users")
      for x in 0 ..< aix.len:
          result = result & cleanQdata(aix[x]).replace(spaces(6),"").replace("', '",", ") & newline() & spaces(6)  
               
@@ -937,7 +934,7 @@ proc fbRevoke*(acon:PyObject,username:string,atable:string ,options:string) =
          echo()
     
     
-proc fbBackup*(database:string,backupfile:string,adminpw:string = "",report:bool=false) =
+proc fbBackup*(database:string,backupfile:string,host:string="localhost",adminuser="sysdba",adminpw:string = "") =
      ## fbBackup
      ##
      ## Firebird database backup
@@ -948,32 +945,19 @@ proc fbBackup*(database:string,backupfile:string,adminpw:string = "",report:bool
      ##
      ## only basic backup is implemented , for advanced scenarios use gbak directly
      ##
-     ## this backup is performed via the python based fdb driver
-     ##
+     ##  
+     
      echo()
      printLnInfoMsg("Firebird",cxpad("Backup started for  : " & database,50),pastelyellowgreen)
-     discard py.exec("""from fdb import services""")
-     discard py.exec("""con = services.connect(password = '$1')""" % adminpw)
-     discard py.exec("""con.backup('$1', '$2', metadata_only=False, collect_garbage=True)""" % [database,backupfile]) 
-     if report == true:
-       discard py.exec("""backup_report = con.readlines()""")
-       printLn("Backup Report for $1 " % database,dodgerblue,xpos=1)
-       discard py.exec("""for rep in backup_report: print(" ",rep) """)
-     discard py.exec("""con.close()""")
-     printLnInfoMsg("Firebird",cxpad("Backup ok      from : " & database,50),pastelorange)
-     printLnInfoMsg("Firebird",cxpad("                 to : " & backupfile,50),pastelorange)
+     var bk = execCmdEx("""gbak -b -se $1:service_mgr $3  $4 -user SYSDBA -pass $2""" % [host,adminpw,database,backupfile])
+     if fileExists(backupfile) == true:
+        printLnInfoMsg("Firebird",cxpad("Backup ok      from : " & database,50),pastelorange)
+        printLnInfoMsg("Firebird",cxpad("                 to : " & backupfile,50),pastelorange)
+     else:
+        printLnInfoMsg("Firebird",cxpad("Backup failure.Check: " & backupfile,50),truetomato)    
      echo()
 
-proc fbBackupnew*(host:string="localhost",database:string,backupfile:string,adminuser:string="",adminpw:string = "") =
-     # WIP as per new api but fails
-     let svc = fdb.connect_server(host,user=adminuser, password=adminpw)
-     discard svc.database.backup(database = database, backup = backupfile,verbose = false)
-     var report = svc.readlines() 
-     cxprintLn(1,"Backup Report: ",$report)
-     discard svc.close()
-     printLnInfoMsg("Firebird",cxpad("Backup ok      from : " & database,50),pastelorange)
-     printLnInfoMsg("Firebird",cxpad("                 to : " & backupfile,50),pastelorange)
-     echo()
+
      
 proc fbBackupRemoteToLocal*(host:string,database:string,backupfile:string,adminpw:string = "") =
      ## fbBackupRemoteToLocal    WIP
@@ -991,7 +975,7 @@ proc fbBackupRemoteToLocal*(host:string,database:string,backupfile:string,adminp
      var bk = execCmdEx("""gbak -b -se $1:service_mgr -user SYSDBA -pass $2  $3 stdout > $4""" % [host,adminpw,database,backupfile])
      if $(bk.exitcode) == "0":
         printLnInfoMsg("Backup","gbak backup status ok",pastelorange)
-        printLnInfoMsg("Backup","Backupfile is : $1" % ["/home/lxuser/Downloads/ubuntunotes.fbk"],pastelorange) 
+        printLnInfoMsg("Backup","Backupfile is : $1" % [backupfile],pastelorange) 
         
      
 proc fbRestoreLocalToRemote*(host:string,database:string,backupfile:string,adminpw:string = "")=
@@ -1027,7 +1011,7 @@ proc fbRestoreLocalToRemote*(host:string,database:string,backupfile:string,admin
         printLnInfoMsg("Restore","gbak restore status fail",truetomato)
  
       
-proc fbRestore*(backupfile:string,database:string,adminpw:string="",replace:bool = false,report:bool=false) =
+proc fbRestore*(backupfile:string,database:string,host:string="localhost",adminuser="sysdba",adminpw:string="",replace:bool = false,report:bool=false) =
      ## fbRestore
      ##
      ## Firebird database restore
@@ -1048,20 +1032,22 @@ proc fbRestore*(backupfile:string,database:string,adminpw:string="",replace:bool
      ##  that backupfiles are treated with same security precautions as the database itself.
      ##
      var restorestring = ""
-     var ov = "No"
      
      printLnInfoMsg("Firebird",cxpad("Restore started for : " & database,50),pastelyellowgreen)
      if replace == false:
          # this will throw an error if database already exists
          #restorestring = "gbak -c $1  $2 -V" % [backupfile,database]  # verbose
-         restorestring = "gbak -c $1  $2" % [backupfile,database]
+         #restorestring = "gbak -c $1  $2" % [backupfile,database]
+         restorestring = "gbak -c -se $1:service_mgr $2 $1:$3 -user SYSDBA -pass $4" % [host,backupfile,database,adminpw]
      else:
          # this will overwrite existing database so we ask for agreement
          if fileExists(database):
              var yn = cxZYesNo("Replace existing file :\L\L$1 " % database) # a zenity messagebox
              if $yn == "yes":
-                  #restorestring = "gbak -c $1  $2 -REP -V" % [backupfile,database] # verbose
+                  #ok
                   restorestring = "gbak -c $1  $2 -REP" % [backupfile,database]
+                  #fails
+                  #restorestring = "gbak -c -se -R $1:service_mgr $2 $1:$3 -user SYSDBA -pass $4" % [host,backupfile,database,adminpw]
              else:
                   restorestring = ""
                   printLnInfoMsg("Firebird",cxpad("Nothing will be restored",50),truetomato)
@@ -1108,9 +1094,23 @@ proc dropDatabase*(database:string,auser:string,auserpw:string) =
     except:
          printLnInfoMsg("Firebird","Database : " & database  & " could not be dropped ",truetomato)
  
+proc shutdown*(acon:PyObject,aconName:string="") =    
+    ## shutdown
+    ##
+    ## close a connection and show status
+    ##
+    printLnBiCol("Connection     : " & aconName,colLeft=plum,xpos=1)
+    fbdisconnect(acon)
+    if connectedflag == true:
+         printLnBiCol("Status         : " & "Connected",colLeft=plum,colRight=cyan,xpos=1)    
+    else:      
+         printLnBiCol("Status         : " & "Disconnected",colLeft=plum,colRight=tomato,xpos=1)
+          
+    echo() 
+ 
 when isMainModule:
     
-    # some quick testing for various functions
+    # Usage examples for various functions
     # run this only with a user who has admin rights , like sysdba
     # other users will need to have relevant roles granted to them 
     # to run successfully.
@@ -1120,13 +1120,16 @@ when isMainModule:
     let logon = cxZLoginDialog()  # get the user/password via cxzenity first
     let user = logon.name          
     let pwx = logon.password      
-        
+    let dbpath  = "Downloads/python3-driver/test/fbtest30.fdb"          # original db
+    let dbpathk = "Downloads/python3-driver/test/fbtest30.fbk"          # backedup db
+    let dbpathr = "Downloads/python3-driver/test/fbtest30-restored.fdb" # restored db
+    
     #below ok  change to wherever the fbtest30.fdb file lives
     #note that permissions must be correct so usually you want
     #to have the .fdb files be part of the firebird group
-    let testdb = "inet://" & getHomeDir() & "Downloads/python3-driver/test/fbtest30.fdb"
+    let testdb = "inet://" & getHomeDir() & dbpath
     # below used in backup gbak utility works only local
-    let testdbflocal = getHomeDir() & "Downloads/python3-driver/test/fbtest30.fdb"
+    let testdbflocal = getHomeDir() & dbpath
     
     #remote connection path example to some database on a remote server ok
     #let testdb = "192.168.1.109/3050:/home/blaah/Downloads/python3-driver/test/fbtest30.fdb" 
@@ -1146,7 +1149,7 @@ when isMainModule:
       discard    
     echo()
     
-    cxprintln(0,plum,"Query output")
+    cxprintln(0,plum,"Query output using showQuery")
     echo()
     showQuery(fbquery(acon,"SELECT first 5 * FROM employee r"))
     echo()
@@ -1205,18 +1208,16 @@ when isMainModule:
     
     deleteUser(adminpw=pwx,username="JOHN2020")
     
-    modifyUser(adminpw=pwx,username="JOHN4",firstname="FrankyBoy",userpassword="johnny")
+    modifyUser(adminpw=pwx,username="JOHN4",firstname="Franky",userpassword="JOHN4")
     
     cxprintLn(1,plum,"Current Users Full Details after delete:")
     getusers(password = pwx)
     echo()
-       
     cxprintLn(1,peru,"End of user manipulation test")   
-       
-    cxprintLn(1,plum,"Disconnection Information ")
-    printLnBiCol(" Fbdisconnect  : " & $fbdisconnect(acon) & "  [ should be true ]")
-    printLnBiCol(" ConnectedFlag : " & $connectedflag & " [ should be false ]")
     echo()
+       
+    shutdown(acon,"acon")
+    
     try:
        cxprintLn(1,peru,"Trying to run a query on a closed connection")  
        showQuery(fbquery(acon,"SELECT first 5 * FROM employee r"))
@@ -1228,34 +1229,46 @@ when isMainModule:
     cxprintLn(1,plum,"Trying to run a backup/restore via gbak   ")
     
     # fbbackup/fbrestore ok
-    fbBackup(testdbflocal,getHomeDir() & "Downloads/python3-driver/test/fbtest30.fbk",pwx) 
+    fbBackup(testdbflocal,getHomeDir() & dbpathk,adminpw=pwx) 
         
     # restoring with rep switch is true so a older restore will be replaced  ok
-    fbRestore(getHomeDir() & "Downloads/python3-driver/test/fbtest30.fbk",
-              getHomeDir() & "Downloads/python3-driver/test/fbtest30-restored.fdb",
+    fbRestore(getHomeDir() & dbpathk,
+              getHomeDir() & dbpathr,
               pwx,
               replace=true) 
     echo()              
-    # now lets test the restored file connect to it
-    acon = fbconnect(dsn=getHomeDir() & "Downloads/python3-driver/test/fbtest30-restored.fdb",user=user,pw=pwx)
+    cxprintLn(1,plum,"Connecting to the restored file")
+    acon = fbconnect(dsn=getHomeDir() & dbpathr,user=user,pw=pwx)
+    acon.fbConStatus("acon")
+    
     cxprintln(0,plum,"Query outputs from restored database")
     echo()
-    showQuery(fbquery(acon,"SELECT first 5 * FROM employee r"))
-    echo()
-    showQuery(fbquery(acon,"select * from country order by currency"))
+    
+    cxprintLn(1,plum,"Example of a prepared cursor and how to get the data")
+    let cur1 = acon.cursor()
+    let ps1 = cur1.prepare("SELECT first 5 * FROM employee r")
+    let cr1 = cur1.execute(ps1)
+    
+    cxprintLn(1,plum,"Fetch one row from the cursor with fetchone")
+    echo cr1.fetchone()
     echo()
     
+    cxprintLn(1,plum,"Iterate over the cursor output and get all of it")
+    for row in cr1:
+          for x in 0..9:
+             var b = row[x] # b is still a pyobject
+             cxprintLn(1,$b)
+          curup(2)  # lets print the item 10 next to item 8 ,which is country
+          cxprintLn(10,$row[10])
+          decho(3)
+          
     # show cursorinfo from a connection
     var cur = acon.cursor()
     showCursorInfo(cur.execute("select * from country"))
     echo()
       
-    # shutdown all again
-    cxprintLn(0,plum,"Disconnection Information ")
-    printLnBiCol(" Disconnected   : " & $fbdisconnect(acon) & "  [ should be true ]")
-    printLnBiCol(" ConnectedFlag  : " & $connectedflag & " [ should be false ]")
-    echo()
-    
+    # shutdown the acon connection again
+    shutdown(acon,"acon")
     doFinish()
                      
-# end of fdb.nim 
+# end of nimfdb.nim 
