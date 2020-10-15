@@ -6,7 +6,7 @@
 # License     : MIT opensource  
 # Version     : 0.1.0
 # ProjectStart: 2020-05-29
-# Last        : 2020-10-05
+# Last        : 2020-10-12
 # Compiler    : Nim >= 1.3.5  or devel branch
 # Description : Access Firebird databases via python3.8+ from Nim
 #               
@@ -55,8 +55,8 @@
 #               fields and other improvements so above is a temporary solution
 #
 #               for bulk inserts or updates it is suggested to use execute block functionality
-#               of the firebird server , see fdbE26.nim for an execute block
-#               example which demonstrates fast inserts. 
+#               of the firebird server , see  for an execute block see 
+#               an (not yet published ) example which demonstrates fast inserts. 
 #               But overall this topic needs to be revisited.
 #
 #               The current commit at the end of fbquery slows bulk insert down
@@ -73,6 +73,9 @@
 #               the distro usually a firebird group is available on linux installations and a user
 #               should be part of this group. Do something like chown firebird /db/new1.fdb
 #
+#               the global connectedflag  currently only tracks one firebird connection
+#               correctly, multiple cursors to multiple databases can be run in your
+#               program but correct connection tracking is currently not possible
 #
 #Todo         : More examples
 #               some more functionality like transactions handling 
@@ -80,6 +83,8 @@
 #               svc.database.shutdown for single user maintenance mode,nbbackup/restore
 #               other functions from firebird-driver. 
 #               
+#                
+#
 # 
 #Other       : https://www.ibphoenix.com/files/ConnectionStrings_Fb3.pdf
 #              https://firebird-driver.readthedocs.io/en/latest/getting-started.html
@@ -90,6 +95,7 @@ import nimpy
 export nimpy
 import nimcx/cxzenity
 
+const NIMFDBVERSION* = " nimfdb version : 0.1.0"
 
 # forward declaration
 proc cleanQdata*(ares:string):string  
@@ -105,8 +111,8 @@ let pyvers* = pysys.version                 # answers what python is in use ques
 let py* = pyBuiltinsModule()                # imports the python buildins
 let os* = pyImport("os")
 
-
-var connectedflag*:bool = false             # global to indicate connection status
+var connectedflag*:bool = false             # global to indicate connection status 
+                                            # only one connection is supported
 
 # utility firebird query strings
 
@@ -138,9 +144,6 @@ BEGIN
 END
 """
 
-   
-
-
 template fbConStatus*(acon:PyObject,aconName:string) =
     ## fbConStatus
     ##
@@ -154,6 +157,7 @@ template fbConStatus*(acon:PyObject,aconName:string) =
     else:
          printLnBiCol("Status     : Connected",colLeft=plum,colRight=cyan,xpos=1)    
     echo()
+
 
 proc parseCxDatetime*(datestring: PyObject): string {.exportpy.} = 
     ## parseCxDatetime
@@ -1102,9 +1106,9 @@ proc shutdown*(acon:PyObject,aconName:string="") =
     printLnBiCol("Connection     : " & aconName,colLeft=plum,xpos=1)
     fbdisconnect(acon)
     if connectedflag == true:
-         printLnBiCol("Status         : " & "Connected",colLeft=plum,colRight=cyan,xpos=1)    
+         printLnBiCol("ShutDownStatus : " & "Connected",colLeft=plum,colRight=cyan,xpos=1)    
     else:      
-         printLnBiCol("Status         : " & "Disconnected",colLeft=plum,colRight=tomato,xpos=1)
+         printLnBiCol("ShutDownStatus : " & "Disconnected",colLeft=plum,colRight=tomato,xpos=1)
           
     echo() 
  

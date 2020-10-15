@@ -12,12 +12,12 @@ Requirements
 
  - latest Nim , tested mainly against the current devel version
  - python3.8.x
- - a Firebird server installation from your distro
+ - a Firebird3 or Firebird4 server installation from your distro
  
 Notes 
 ------------------- 
  - our test firebird database has abt 7 million rows of [tatoeba](https://tatoeba.org/eng/) sentences
-   and selects translations via the tatoeba links table with abt 17 million rows.
+   and to translations via the tatoeba links table with abt 17 million rows.
   
 
 Installation
@@ -49,7 +49,7 @@ Functions Overview
 |  - [x] fbGrant             | grant user rights                                                |
 |  - [x] fbRevoke            | revoke user rights                                               |
 |  - [x] addUser             | add a new user                                                   |
-|  - [ ] modifyUser          | modify a user                                                    |
+|  - [X] modifyUser          | modify a user                                                    |
 |  - [x] deleteUser          | delete a user                                                    |
 |  - [x] getRowCount         | get row count from a tables                                      |
 |  - [x] getPrimarkeys       | returns primarkeys of a connectedion                             |
