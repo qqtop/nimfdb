@@ -6,7 +6,7 @@
 # License     : MIT opensource  
 # Version     : 0.1.0
 # ProjectStart: 2020-05-29
-# Last        : 2020-10-12
+# Last        : 2020-11-01
 # Compiler    : Nim >= 1.3.5  or devel branch
 # Description : Access Firebird databases via python3.8+ from Nim
 #               
@@ -18,7 +18,7 @@
 #               
 #               python pip install firebird-driver
 #
-#               with python3.8.x , all pulled in via nimpy
+#               with python3.8.x , accessed via nimpy
 #            
 #
 # Tested with : firebird3.x Superserver 
@@ -59,7 +59,7 @@
 #               an (not yet published ) example which demonstrates fast inserts. 
 #               But overall this topic needs to be revisited.
 #
-#               The current commit at the end of fbquery slows bulk insert down
+#               The current commit at the end of fbquery slows bulk inserts down
 #               bulk means hundreds or thousands of records. 
 #
 #               it uses gbak so make sure it is in the path
@@ -77,6 +77,8 @@
 #               correctly, multiple cursors to multiple databases can be run in your
 #               program but correct connection tracking is currently not possible
 #
+#               for sample usage of this driver see code at bottom of this file 
+#
 #Todo         : More examples
 #               some more functionality like transactions handling 
 #               events,streamblobs,charset conversions,connection and other hooks, 
@@ -93,9 +95,9 @@
 import nimcx 
 import nimpy
 export nimpy
-import nimcx/cxzenity
 
-const NIMFDBVERSION* = " nimfdb version : 0.1.0"
+
+const NIMFDBVERSION* = " nimfdb version : 0.1.5"
 
 # forward declaration
 proc cleanQdata*(ares:string):string  
@@ -112,16 +114,16 @@ let py* = pyBuiltinsModule()                # imports the python buildins
 let os* = pyImport("os")
 
 var connectedflag*:bool = false             # global to indicate connection status 
-                                            # only one connection is supported
+                                            # only one con#nection is supported
 
-# utility firebird query strings
+# basic utility firebird query strings
 
 let odsversion* = "SELECT RDB$GET_CONTEXT('SYSTEM','ENGINE_VERSION') FROM RDB$DATABASE"
 # query to get isolation level of a connection
 let isolevel* = "SELECT RDB$GET_CONTEXT('SYSTEM', 'ISOLATION_LEVEL') FROM RDB$DATABASE"
 # query to get server time for reference only not much use inside nim
 let servertime* = "select current_timestamp from rdb$database"
-# query to get best current time and day for reference only not much use inside nim
+# query to get current time and day for reference only not much use inside nim
 let currenttime* = "select cast('now' as timestamp) from rdb$database"
 let currentday*  = "select cast('today' as date) from rdb$database"
 # query to count rows in all tables of a connected database needs sysdba or admin rights
@@ -169,6 +171,7 @@ proc parseCxDatetime*(datestring: PyObject): string {.exportpy.} =
     ##   printLnBiCol("parseCxdatetime  : " & parseCxDatetime((datetime.datetime(2019,7,15,5,10,3,2345))).strip()) 
     ## 
     result = $datestring
+    
 
 proc getPytime*():string =
     ## getpytime
@@ -376,7 +379,10 @@ proc fbquery*(acon:PyObject,qstring:string,raiseflag:bool = false):seq[string] {
                  discard acon.execute_immediate(qstring) # no result set eg. insert update create etc
              except:          
                  printLnInfoMsg("Firebird","Error raised in fbquery with: " & qstring ,truetomato)
-                 printLnInfoMsg("Firebird",getCurrentExceptionMsg(),truetomato) 
+                 var fberr = $(getCurrentExceptionMsg())
+                 var sfberr = fberr.splitLines() # for better display
+                 for fbline in sfberr:
+                    printLnInfoMsg("Firebird",fmtx(["",""],spaces(2),fbline),truetomato) 
                  if raiseflag == true:
                     quit() # testing  or during development we exit on first error
                  else:
@@ -420,7 +426,7 @@ proc cleanQdata*(ares:string):string =
 proc showQuery*(okres:seq[string],printit:bool = true):seq[string] {.discardable.} =
        ## showQuery
        ## 
-       ## Displays query result and also returns results as a seq[string]
+       ## Displays raw query result and also returns results as a seq[string]
        ##
        ## for further processing. okres is usually the output of a fbquery run.
        ##
@@ -443,6 +449,8 @@ proc createFbDatabase*(dsn:string,auser:string,apassword:string,charset:string="
     ## 
     ## see firebird database manual
     ## 
+    ## need to consider to drop generators and triggers for this database
+    ## maybe overwrite == true need to drop the database
         
     try:
       # to check if database exists we just connect and close ,
@@ -567,6 +575,23 @@ proc createFbIndex*(acon:PyObject,indexdata:string) =
     
 # utility functions mainly for sysadmin use
 # needs more testing due to python driver api changes
+
+proc fbGeneratorReset*(dsn,user,adminpw,genname:string,value:int=0) =
+    ## fbGeneratorReset
+    ##
+    ## reset the value of a generator in a database
+    ## a call may look like so:
+    ##
+    ##.. code-block:: nim
+    ##   fbGeneratorReset(dsn,user,adminpw,"GEN_CTRK_ID",0)
+    ##
+    # resetgen to set to 0  
+    let resetgen = "ALTER SEQUENCE $1 RESTART WITH $2" % [genname,$value]
+    let svc = fbconnect(dsn,user=user, pw=adminpw)
+    discard fbquery(svc,resetgen)  
+    fbdisconnect(svc)
+
+
 
 proc getOds*(acon:PyObject):string = 
    ## getOds
@@ -1046,8 +1071,11 @@ proc fbRestore*(backupfile:string,database:string,host:string="localhost",adminu
      else:
          # this will overwrite existing database so we ask for agreement
          if fileExists(database):
-             var yn = cxZYesNo("Replace existing file :\L\L$1 " % database) # a zenity messagebox
-             if $yn == "yes":
+             # while it works maybe we should not use cxZYesNo here to keep it more pure
+             #var yn = cxZYesNo("Replace existing file :\L\L$1 " % database) # a zenity messagebox
+             var yn = cxinput("\L" & plum & "Replace existing file :\L" & yellowgreen & "  $1\L" % [database] & plum & "[yes/no] : " )
+             echo()
+             if yn == "yes":
                   #ok
                   restorestring = "gbak -c $1  $2 -REP" % [backupfile,database]
                   #fails
@@ -1113,8 +1141,8 @@ proc shutdown*(acon:PyObject,aconName:string="") =
     echo() 
  
 when isMainModule:
-    
-    # Usage examples for various functions
+    import nimcx/cxzenity
+    # Usage examples for various functions in nimfdb
     # run this only with a user who has admin rights , like sysdba
     # other users will need to have relevant roles granted to them 
     # to run successfully.

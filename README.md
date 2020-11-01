@@ -17,7 +17,7 @@ Requirements
 Notes 
 ------------------- 
  - our test firebird database has abt 7 million rows of [tatoeba](https://tatoeba.org/eng/) sentences
-   and to translations via the tatoeba links table with abt 17 million rows.
+   and a tatoeba links table with abt 17 million rows.
   
 
 Installation
@@ -91,8 +91,13 @@ Functions Overview
 
 Main functions work fine , some of the administration functions
 need more testing as the underlying python api is still in flux.
-Advanced management utilities need more testing .
+Advanced management utility functions steel need more testing .
 Connections via embedded or tcp work fine .
+
+
+
+
+
 
 The python driver lives here [firebird-driver](https://github.com/FirebirdSQL/python3-driver) 
 
