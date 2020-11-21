@@ -6,7 +6,7 @@
 # License     : MIT opensource  
 # Version     : 0.1.5
 # ProjectStart: 2020-05-29
-# Last        : 2020-11-05
+# Last        : 2020-11-21
 # Compiler    : Nim >= 1.3.5  or devel branch
 # Description : Access Firebird databases via python3.8+ from Nim
 #               
@@ -276,7 +276,10 @@ proc showDbInfo*(acon:PyObject) =
      printLnBiCol(" QueryTransaction   : " & $(acon.query_transaction))
      printLnBiCol(" Connection active  : " & $(acon.is_active()))
      printLnBiCol(" Connection closed  : " & $(acon.is_closed()))
-     printLnBiCol(" Attachment Id      : " & $(acon.info.attachment_id))
+     try:
+        printLnBiCol(" Attachment Id      : " & $(acon.info.attachment_id))
+     except:
+        printLnBiCol(" Attachment Id      : Not established .",colLeft=truetomato)    
      printLnBiCol(" Database Page Size : " & $(acon.info.page_size))
      printLnBiCol(" Used pages         : " & $(acon.info.pages_used))
      printLnBiCol(" Free pages         : " & $(acon.info.pages_free))
