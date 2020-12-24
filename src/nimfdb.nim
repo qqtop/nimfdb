@@ -1,12 +1,12 @@
 # #######################################################################################################
 # Program     : nimfdb.nim  
 # Status      : Development  
-#               based on and using the newest python firebird driver 
+#               based on and using the newest python firebird-driver 
 #               https://github.com/FirebirdSQL/python3-driver via nimpy
 # License     : MIT opensource  
 # Version     : 0.1.5
 # ProjectStart: 2020-05-29
-# Last        : 2020-11-21
+# Last        : 2020-12-10
 # Compiler    : Nim >= 1.3.5  or devel branch
 # Description : Access Firebird databases via python3.8+ from Nim
 #               
@@ -91,25 +91,25 @@ import nimcx
 import nimpy
 export nimpy
 
-const NIMFDBVERSION* = " nimfdb version : 0.1.5"
+const NIMFDBVERSION* = " nimfdb version : 0.1.6"
 
 # forward declaration
-proc cleanQdata*(ares:string):string  
+func cleanQdata*(ares:string):string {.inline.} 
 proc fbGrant*(acon:PyObject,username:string,atable:string ,options:string)
 
 #required python imports
-let fdb* = pyImport("""firebird.driver""")  # import the actual python driver here
 let fdbase* = pyImport("""firebird.base""") # import the driver base in case its needed 
+let fdb* = pyImport("""firebird.driver""")  # import the actual python driver here
 let datetime* = pyImport("datetime")        # import the python datetime module
 let pytime* = pyImport("time")              # import the python time module 
-let pysys* = pyImport("sys")                # import the python driver sys module
+let pysys* = pyImport("sys")                # import the python sys module
 let pyvers* = pysys.version                 # answers what python is in use question
 let py* = pyBuiltinsModule()                # imports the python buildins
-let os* = pyImport("os")
+let os* = pyImport("os")                    # imports the python os module
 
 
 proc connectedflag*(acon:PyObject):bool {.inline.} = 
-     # note the reverse logic if is_closed == false hencez it is open and connected
+     # note the reverse logic if is_closed == false hence it is open and connected
      let atm = $acon.is_closed()
      if  atm == "False":
          result = true   # that is connected
@@ -126,7 +126,7 @@ let odsversion* = "SELECT RDB$GET_CONTEXT('SYSTEM','ENGINE_VERSION') FROM RDB$DA
 let isolevel* = "SELECT RDB$GET_CONTEXT('SYSTEM', 'ISOLATION_LEVEL') FROM RDB$DATABASE"
 # query to get server time for reference only not much use inside nim
 let servertime* = "select current_timestamp from rdb$database"
-# query to get current time and day for reference only not much use inside nim
+# query to get current time and day of server location
 let currenttime* = "select cast('now' as timestamp) from rdb$database"
 let currentday*  = "select cast('today' as date) from rdb$database"
 # query to count rows in all tables of a connected database needs sysdba or admin rights
@@ -178,13 +178,13 @@ proc parseCxDatetime*(datestring: PyObject): string {.exportpy.} =
     
 
 proc getPytime*():string =
-    ## getpytime
+    ## getPyTime
     ##
     ## returns string representation of the current time from python
     ##
     ##.. code-block:: nim
     ##
-    ##   printLnBiCol("getPytime        : " & getpytime())
+    ##   printLnBiCol("getPytime        : " & getPyTime())
     ##
     result = parseCxDatetime(datetime.datetime.fromtimestamp(pytime.time())).strip()
  
@@ -391,8 +391,8 @@ proc fbquery*(acon:PyObject,qstring:string,raiseflag:bool = false):seq[string] {
                  discard acon.execute_immediate(qstring) # no result set eg. insert update create etc
              except:          
                  printLnInfoMsg("Firebird","Error raised in fbquery with: " & qstring ,truetomato)
-                 var fberr = $(getCurrentExceptionMsg())
-                 var sfberr = fberr.splitLines() # for better display
+                 let fberr = $(getCurrentExceptionMsg())
+                 let sfberr = fberr.splitLines() # for better display
                  for fbline in sfberr:
                     printLnInfoMsg("Firebird",fmtx(["",""],spaces(2),fbline),truetomato) 
                  if raiseflag == true:
@@ -405,7 +405,7 @@ proc fbquery*(acon:PyObject,qstring:string,raiseflag:bool = false):seq[string] {
                                 # see example for EXECUTE BLOCK for faster insert
                                 
                                           
-proc cleanQdata*(ares:string):string =     
+func cleanQdata*(ares:string):string  =     
          # cleans most artifacts returned from the query executed in python
          # some may still resist though , change if your requirements are different
          # const Punctuation* = { ',', '(',')','{','}','.', '!', ';', '"','\'' } # just parked here
@@ -987,13 +987,23 @@ proc fbBackup*(database:string,backupfile:string,host:string="localhost",adminus
      ##  
      
      echo()
-     printLnInfoMsg("Firebird",cxpad("Backup started for  : " & database,50),pastelyellowgreen)
-     let bk = execCmdEx("""gbak -b -se $1:service_mgr $3  $4 -user SYSDBA -pass $2""" % [host,adminpw,database,backupfile])
-     if fileExists(backupfile) == true:
-        printLnInfoMsg("Firebird",cxpad("Backup ok      from : " & database,50),pastelorange)
-        printLnInfoMsg("Firebird",cxpad("                 to : " & backupfile,50),pastelorange)
+     printLnInfoMsg("Firebird",cxpad("Backup started for  : " & database,50),colLeft=pastelyellowgreen)
+     var bk = execCmdEx("""gbak -b -V -se $1:service_mgr $3 $4 -user SYSDBA -password $2""" % [host,adminpw,database,backupfile])
+     if $(bk.exitcode) <> "0":
+         #service manager failed
+         printLnInfoMsg("Firebird","Backup without service_mgr",colLeft=pastelpink)
+         var bks = """gbak -b -V $3  $4 -user SYSDBA -password $2""" % [host,adminpw,database,backupfile]
+         #echo bks  #for debug
+         bk = execCmdEx(bks)
+         
+     if fileExists(backupfile) == true and $(bk.exitcode) == "0":
+        var t1 = cxpad("Backup ok      from : " & database,50)
+        var t2 = cxpad("                 to : " & backupfile,50)
+        printLnInfoMsg("Firebird",t1,colLeft=pastelOrange)
+        printLnInfoMsg("Firebird",t2,colLeft=pastelOrange)
      else:
-        printLnInfoMsg("Firebird",cxpad("Backup failure.Check: " & backupfile,50),truetomato)    
+        var t3 = cxpad("Backup failure.Check: " & backupfile,50)
+        printLnInfoMsg("Firebird ",t3,colLeft=truetomato)    
      echo()
 
 
@@ -1013,9 +1023,21 @@ proc fbBackupRemoteToLocal*(host:string,database:string,backupfile:string,adminp
      printLnInfoMsg("Firebird",cxpad("Backup started for  : " & database,50),pastelyellowgreen)
      var bk = execCmdEx("""gbak -b -se $1:service_mgr -user SYSDBA -pass $2  $3 stdout > $4""" % [host,adminpw,database,backupfile])
      if $(bk.exitcode) == "0":
-        printLnInfoMsg("Backup","gbak backup status ok",pastelorange)
-        printLnInfoMsg("Backup","Backupfile is : $1" % [backupfile],pastelorange) 
-        
+        printLnInfoMsg("Firebird","RemotetoLocal gbak backup status ok",pastelorange)
+        printLnInfoMsg("Firebird","Backupfile is : $1" % [backupfile],pastelorange) 
+     else:
+       block:
+         # this sometimes fails due to service_mgr issue , so we try this
+         printLnInfoMsg("Backup","RemoteToLocal backup without service_mgr")
+         var bks = """gbak -b -V $3  $4 -user SYSDBA -password $2""" % [host,adminpw,database,backupfile]
+         echo bks
+         var bk = execCmdEx(bks)
+         #var bk = execCmdEx("""gbak -b -V $3  $4  -user SYSDBA -password $2""" % [host,adminpw,database,backupfile])
+         if $(bk.exitcode) == "0":
+            printLnInfoMsg("Firebird","RemoteToLocal backup without service_mgr succeeded",pastelorange)
+            printLnInfoMsg("Firebird","RemoteToLocal gbak backup status ok",pastelorange)
+            printLnInfoMsg("Firebird","Backupfile is : $1" % [backupfile],pastelorange)    
+           
      
 proc fbRestoreLocalToRemote*(host:string,database:string,backupfile:string,adminpw:string = "")=
      ## fbRestoreLocalRemote      WIP
@@ -1041,13 +1063,13 @@ proc fbRestoreLocalToRemote*(host:string,database:string,backupfile:string,admin
              database.removeSuffix(".fdb")
              database = database & "-restored.fdb" # correct to the new name for our to be restored database
              
-     printLnInfoMsg("Firebird",cxpad("Restore started for : " & database,50),pastelyellowgreen)
+     printLnInfoMsg("Firebird",cxpad("LocalToRemote restore started for : " & database,50),pastelyellowgreen)
      var rs = execCmdEx("""gbak -c -se $1:service_mgr -user SYSDBA -pass $2 stdin $3 < $4"""  % [host,adminpw,database,backupfile])
      if $(rs.exitcode) == "0":
-        printLnInfoMsg("Restore","gbak restore status ok",pastelorange)
-        printLnInfoMsg("Restore","Restored to $1" % [database],pastelorange)  
+        printLnInfoMsg("Firebird","LocalToRemote gbak restore status ok",pastelorange)
+        printLnInfoMsg("Firebird","Restored to $1" % [database],pastelorange)  
      else: 
-        printLnInfoMsg("Restore","gbak restore status fail",truetomato)
+        printLnInfoMsg("Firebird","LocalToRemote gbak restore status fail",truetomato)
  
       
 proc fbRestore*(backupfile:string,database:string,host:string="localhost",adminuser="sysdba",adminpw:string="",replace:bool = false,report:bool=false) =
@@ -1082,20 +1104,21 @@ proc fbRestore*(backupfile:string,database:string,host:string="localhost",adminu
          # this will overwrite existing database so we ask for agreement
          if fileExists(database):
              # while it works maybe we should not use cxZYesNo here to keep it more pure
-             #var yn = cxZYesNo("Replace existing file :\L\L$1 " % database) # a zenity messagebox
+             # var yn = cxZYesNo("Replace existing file :\L\L$1 " % database) # a zenity messagebox
              let yn = cxinput("\L" & plum & "Replace existing file :\L" & yellowgreen & "  $1\L" % [database] & plum & "[yes/no] : " )
              decho(2)
-             if yn == "yes":
+             if tolowerAscii(yn) == "yes" or tolowerAscii(yn) == "y":
                   #ok
-                  restorestring = "gbak -c $1  $2 -REP" % [backupfile,database]
-                  #fails
-                  #restorestring = "gbak -c -se -R $1:service_mgr $2 $1:$3 -user SYSDBA -pass $4" % [host,backupfile,database,adminpw]
+                  #restorestring = "gbak -c $1  $2 -REP" % [backupfile,database]
+                  #if this fails  -- maybe a network configuration issue check firewall, allowed hosts etc.
+                  restorestring = "gbak -c -se -R $1:service_mgr $2 $1:$3 -user SYSDBA -pass $4" % [host,backupfile,database,adminpw]
              else:
                   restorestring = ""
                   printLnInfoMsg("Firebird",cxpad("Nothing will be restored",50),truetomato)
          else:
              #if databasefile is not existing we simply restore
              #restorestring = "gbak -c $1  $2 -V" % [backupfile, database] # verbose
+             printLnInfoMsg("Firebird",cxpad("Standard restore",50),pastelpink)
              restorestring = "gbak -c $1  $2" % [backupfile, database]
                               
      if restorestring.len > 0:
@@ -1110,7 +1133,7 @@ proc fbRestore*(backupfile:string,database:string,host:string="localhost",adminu
             printLnInfoMsg("Firebird",cxpad("Restored       from : " & backupfile ,50),pastelorange)
             printLnInfoMsg("Firebird",cxpad("                 to : " & database,50),pastelorange)
         else:
-            printLnInfoMsg("Firebird",cxpad("Check output . gbak exitcode : " & $(restoreres.exitCode),50),truetomato)
+            printLnInfoMsg("Firebird",cxpad("Restore Alert -> gbak exitcode : " & $(restoreres.exitCode),50),truetomato)
      else:
          printLnInfoMsg("Firebird",cxpad("Nothing Restored",50),truetomato)
 
@@ -1156,17 +1179,21 @@ when isMainModule:
     # setup
     let logon = cxZLoginDialog()  # get the user/password via cxzenity first
     let user = logon.name          
-    let pwx = logon.password      
+    let pwx = logon.password   
+    
+    # change to wherever the fbtest30.fdb file lives   
     let dbpath  = "Downloads/python3-driver/test/fbtest30.fdb"          # original db
     let dbpathk = "Downloads/python3-driver/test/fbtest30.fbk"          # backedup db
     let dbpathr = "Downloads/python3-driver/test/fbtest30-restored.fdb" # restored db
     
-    #below ok  change to wherever the fbtest30.fdb file lives
     #note that permissions must be correct so usually you want
     #to have the .fdb files be part of the firebird group
     let testdb = "inet://" & getHomeDir() & dbpath
     # below used in backup gbak utility works only local
     let testdbflocal = getHomeDir() & dbpath
+    if not fileExists(testdbflocal):
+         printLnAlertMsg("Database " & testdbflocal & " not found ")
+         doByeBye()
     
     #remote connection path example to some database on a remote server ok
     #let testdb = "192.168.1.109/3050:/home/blaah/Downloads/python3-driver/test/fbtest30.fdb" 

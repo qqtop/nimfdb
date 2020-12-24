@@ -12,11 +12,12 @@ Requirements
 
  - latest Nim , tested mainly against the current devel version
  - python3.8.x
- - a Firebird3 or Firebird4 server installation from your distro
+ - a Firebird3 server installation from your distro
  
 Notes 
 ------------------- 
  - our test firebird database has abt 7 million rows of [tatoeba](https://tatoeba.org/eng/) sentences
+
    and a tatoeba links table with abt 17 million rows.
   
 
@@ -91,8 +92,8 @@ Functions Overview
 
 Main functions work fine , some of the administration functions
 need more testing as the underlying python api is still in flux.
-Advanced management utility functions steel need more testing .
-Connections via embedded or tcp work fine .
+Advanced management utility functions still need more testing .
+Connections via embedded or tcp tested ok.
 
 
 
