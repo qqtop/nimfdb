@@ -114,6 +114,6 @@ Learn about the [Firebird Project](https://www.firebirdsql.org/en/start/)
 
 ![Image](http://qqtop.github.io/qqtop1.png?raw=true)
 
-Oct 2020
+Dec 2020
 
 
