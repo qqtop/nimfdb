@@ -11,14 +11,16 @@ Requirements
 -------------------
 
  - latest Nim , tested mainly against the current devel version
- - python3.8.x
+ - python3.8.x or python3.9.x
  - a Firebird3 server installation from your distro
  
 Notes 
 ------------------- 
  - our test firebird database has abt 7 million rows of [tatoeba](https://tatoeba.org/eng/) sentences
 
-   and a tatoeba links table with abt 17 million rows.
+   and a tatoeba links table with abt 17 million rows. The Firebird Server runs on a Raspberry 4
+
+   with Ubuntu 20.4 LTS.  
   
 
 Installation
@@ -98,8 +100,6 @@ Connections via embedded or tcp tested ok.
 
 
 
-
-
 The python driver lives here [firebird-driver](https://github.com/FirebirdSQL/python3-driver) 
 
 Read the [firebird-driver-documentation](https://firebird-driver.readthedocs.io/en/latest/index.html)
@@ -114,6 +114,6 @@ Learn about the [Firebird Project](https://www.firebirdsql.org/en/start/)
 
 ![Image](http://qqtop.github.io/qqtop1.png?raw=true)
 
-Dec 2020
+Jan 2021
 
 

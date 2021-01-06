@@ -6,8 +6,8 @@
 # License     : MIT opensource  
 # Version     : 0.1.5
 # ProjectStart: 2020-05-29
-# Last        : 2020-12-10
-# Compiler    : Nim >= 1.3.5  or devel branch
+# Last        : 2021-01-06
+# Compiler    : Nim >= 1.4.2  or devel branch suggested
 # Description : Access Firebird databases via python3.8+ from Nim
 #               
 #               Linux only 
@@ -21,7 +21,7 @@
 #               with python3.8.x , accessed via nimpy
 #            
 #
-# Tested with : firebird3.x Superserver 
+# Tested with : firebird3.x Superserver , python3.9
 #
 # Requirements: firebird-driver
 #
@@ -53,11 +53,12 @@
 #                          
 #               This will change with firebird4 as there will be timestamp with timezone 
 #               fields and other improvements so above is a temporary solution
+#               and we will move to firebird4 as soon as feasible
 #
 #               for bulk inserts or updates it is suggested to use execute block functionality
 #               of the firebird server , see  for an execute block see 
-#               an (not yet published ) example which demonstrates fast inserts. 
-#               But overall this topic needs to be revisited.
+#               an (not yet published) example which demonstrates fast inserts. 
+#               But overall this topic needs to be revisited and tested.
 #
 #               The current commit at the end of fbquery slows bulk inserts down
 #               bulk means hundreds or thousands of records. 
@@ -997,8 +998,8 @@ proc fbBackup*(database:string,backupfile:string,host:string="localhost",adminus
          bk = execCmdEx(bks)
          
      if fileExists(backupfile) == true and $(bk.exitcode) == "0":
-        var t1 = cxpad("Backup ok      from : " & database,50)
-        var t2 = cxpad("                 to : " & backupfile,50)
+        var t1 = cxpad("Backup ok  -->  from : " & database,50)
+        var t2 = cxpad("           -->    to : " & backupfile,50)
         printLnInfoMsg("Firebird",t1,colLeft=pastelOrange)
         printLnInfoMsg("Firebird",t2,colLeft=pastelOrange)
      else:
@@ -1109,9 +1110,10 @@ proc fbRestore*(backupfile:string,database:string,host:string="localhost",adminu
              decho(2)
              if tolowerAscii(yn) == "yes" or tolowerAscii(yn) == "y":
                   #ok
-                  #restorestring = "gbak -c $1  $2 -REP" % [backupfile,database]
-                  #if this fails  -- maybe a network configuration issue check firewall, allowed hosts etc.
-                  restorestring = "gbak -c -se -R $1:service_mgr $2 $1:$3 -user SYSDBA -pass $4" % [host,backupfile,database,adminpw]
+                  restorestring = "gbak -c $1  $2 -REP " % [backupfile,database]
+                  
+                  #svc mgr style fails sometimes -- maybe a network configuration issue check firewall, allowed hosts etc.
+                  #restorestring = "gbak -c -se -R $1:service_mgr $2 $1:$3 -user SYSDBA -pass $4" % [host,backupfile,database,adminpw]
              else:
                   restorestring = ""
                   printLnInfoMsg("Firebird",cxpad("Nothing will be restored",50),truetomato)
@@ -1130,10 +1132,11 @@ proc fbRestore*(backupfile:string,database:string,host:string="localhost",adminu
          for line in restoreres.output.splitLines():                 
             cxprintLn(1,dodgerblue,line)
         if restoreres.exitCode == 0:
-            printLnInfoMsg("Firebird",cxpad("Restored       from : " & backupfile ,50),pastelorange)
-            printLnInfoMsg("Firebird",cxpad("                 to : " & database,50),pastelorange)
+            printLnInfoMsg("Firebird",cxpad("Restored   -->  from : " & backupfile ,50),pastelorange)
+            printLnInfoMsg("Firebird",cxpad("           -->    to : " & database,50),pastelorange)
         else:
             printLnInfoMsg("Firebird",cxpad("Restore Alert -> gbak exitcode : " & $(restoreres.exitCode),50),truetomato)
+            printLnInfoMsg("Firebird",cxpad("gbak output                    : " & $restoreres,50),pastelOrange)
      else:
          printLnInfoMsg("Firebird",cxpad("Nothing Restored",50),truetomato)
 
@@ -1295,10 +1298,10 @@ when isMainModule:
     # fbbackup/fbrestore ok
     fbBackup(testdbflocal,getHomeDir() & dbpathk,adminpw=pwx) 
         
-    # restoring with rep switch is true so a older restore will be replaced  ok
+    cxprintLn(1,plum,"Restoring with rep switch is true so a older restore will be replaced") 
     fbRestore(getHomeDir() & dbpathk,
               getHomeDir() & dbpathr,
-              pwx,
+              adminpw=pwx,
               replace=true) 
     echo()              
     cxprintLn(1,plum,"Connecting to the restored file")
