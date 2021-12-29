@@ -6,8 +6,8 @@
 # License     : MIT opensource  
 # Version     : 0.1.5
 # ProjectStart: 2020-05-29
-# Last        : 2021-01-06
-# Compiler    : Nim >= 1.4.2  or devel branch suggested
+# Last        : 2021-12-28
+# Compiler    : Nim >= 1.6.0  or devel branch suggested
 # Description : Access Firebird databases via python3.8+ from Nim
 #               
 #               Linux only 
@@ -16,14 +16,14 @@
 #
 #               requires python firebird-driver installed via
 #               
-#               python pip install firebird-driver
+#               python pip install -U firebird-driver
 #
-#               with python3.8.x , accessed via nimpy
+#               accessed via nimpy
 #            
 #
-# Tested with : firebird3.x Superserver , python3.9
+# Tested with : firebird3.x Superserver , firebird4.x Superserver ,python3.9
 #
-# Requirements: firebird-driver
+# Requirements: firebird-driver      
 #
 #               zenity for graphical gtk+ messageboxes etc
 # 
@@ -35,6 +35,7 @@
 #               for datetime fields it may be better to use varchar and fill them
 #               with something like:  let mydatetime = quoteshellposix(cxnow()) 
 #               this results in output like 2019-08-26 20:35:52+08:00
+#               depending on requirements 
 #
 #               another way is to use python now.strftime("%Y-%m-%d %H:%M:%S")
 #               python example formating to return a python string  :
@@ -50,18 +51,20 @@
 #                print(today)
 #                print(today.strftime("%Y-%m-%d %H:%M:%S"))
 #                print(today.strftime("%Y-%m-%d %H:%M:%S.%f"))
+#                
+#                f"Today is {datetime.datetime.now():%Y/%m/%d}."
+#                    
 #                          
-#               This will change with firebird4 as there will be timestamp with timezone 
+#               In firebird4 there is a new type timestamp with timezone 
 #               fields and other improvements so above is a temporary solution
-#               and we will move to firebird4 as soon as feasible
-#
+#               
 #               for bulk inserts or updates it is suggested to use execute block functionality
-#               of the firebird server , see  for an execute block see 
-#               an (not yet published) example which demonstrates fast inserts. 
+#               of the firebird server ,  for an execute block see 
+#               an (not yet published  :) ) example which demonstrates fast inserts. 
 #               But overall this topic needs to be revisited and tested.
 #
-#               The current commit at the end of fbquery slows bulk inserts down
-#               bulk means hundreds or thousands of records. 
+#               The current commit at the end of fbquery slows bulk inserts down,
+#               bulk means hundreds or thousands of records added in a loop 
 #
 #               Backup/Restore  uses firebird utility gbak so make sure it is in the path
 #
@@ -73,9 +76,12 @@
 #               or all kinds of error messages from the python driver may occure . Depending on 
 #               the distro usually a firebird group is available on linux installations and a user
 #               should be part of this group. Do something like chown firebird /db/new1.fdb
-#
+#               On newly created or restored databases always check permissions of the file and directory.
+#                
 #
 #               for sample usage of this driver see code at bottom of this file 
+#               you will need to change the relevant paths to where you fdb files actually live.
+#               fbtest40.fdb is the file provided by the python driver as pointed to above 
 #
 #Todo         : More examples
 #               some more functionality like transactions handling 
@@ -92,7 +98,7 @@ import nimcx
 import nimpy
 export nimpy
 
-const NIMFDBVERSION* = " nimfdb version : 0.1.6"
+const NIMFDBVERSION* = " nimfdb version : 0.1.8"
 
 # forward declaration
 func cleanQdata*(ares:string):string {.inline.} 
@@ -108,17 +114,18 @@ let pyvers* = pysys.version                 # answers what python is in use ques
 let py* = pyBuiltinsModule()                # imports the python buildins
 let os* = pyImport("os")                    # imports the python os module
 
-
 proc connectedflag*(acon:PyObject):bool {.inline.} = 
      # note the reverse logic if is_closed == false hence it is open and connected
-     let atm = $acon.is_closed()
-     if  atm == "False":
-         result = true   # that is connected
-     elif atm == "True":
-         result = false  # that is disconnected
-     # for debug only
-     #cxprintLn(1,dodgerblue,"------>",atm)    
-     
+     try:
+         let atm = $acon.is_closed()
+         if  atm == "False":
+             result = true   # that is connected
+         elif atm == "True":
+             result = false  # that is disconnected
+     except:
+         cxprintLn(1,"Hmmm failed during connection ? ")
+         raise    
+         
 
 # basic utility firebird query strings
 
@@ -157,11 +164,13 @@ proc showConStatus*(acon:PyObject,aconName:string="") =
     ## call like so : showConStatus(fbacon,"fbacon")  aconName can also be the databasename
     ##
     echo()
+    cxprintLn(1,cxfg(cxgrey0),cxbg(cxpink8),"[Firebird]",cxfg(cxgrey0),cxbg(cxindigo8),cxpad(" Connection Status ",53))
+    echo()
     cxprintLn(1,plum,"Connection : ",white, aconName)
     if acon.connectedflag == false:
          printLnBiCol("Status     : Disconnected",colLeft=plum,colRight=tomato,xpos=1)
     else:
-         printLnBiCol("Status     : Connected",colLeft=plum,colRight=cyan,xpos=1)    
+         printLnBiCol("Status     : Connected",colLeft=plum,colRight=cxfg(cxgreen4),xpos=1)    
     echo()
 
 
@@ -240,7 +249,7 @@ proc showServerInfo*(host:string="localhost",user:string="sysdba", password:stri
      ## displays server related data via the firebird-driver info api 
      # 
      decho(2)
-     printLnInfoMsg("Firebird",cxpad("Server Information " & host,53),pastelorange)
+     cxprintLn(1,cxfg(cxgrey0),cxbg(cxpink8),"[Firebird]",cxfg(cxgrey0),cxbg(cxindigo8),cxpad(" Server Information " & host,53))
      echo()
      let svc = fdb.connect_server(host,user=user, password = password)
      printLnBiCol(" Firebird Arch.    : " & $svc.info.architecture)
@@ -260,7 +269,7 @@ proc showDbInfo*(acon:PyObject) =
      ## displays information about the currently connected database
      ##
      decho(2)
-     printLnInfoMsg("Firebird",cxpad("Current Database Information",53),pastelorange)
+     cxprintLn(1,cxfg(cxgrey0),cxbg(cxpink8),"[Firebird]",cxfg(cxgrey0),cxbg(cxindigo8),cxpad(" Current Database Information ",53))
      echo()
      printLnBicol(" Database Name      : " & $(acon.info.name.upper()))
      printLnBiCol(" Creation Date      : " & $(acon.info.creation_date))
@@ -299,7 +308,7 @@ proc fbConnect*(dsn,user,pw:string,role:string="",fail:bool=true):PyObject =
           ## 
           ## dsn will depend on your server setup
           ## 
-          ## locally this may work :  INET:///path_to_fdb
+          ## locally this may work : INET:///path_to_fdb
           ## 
           ## remote this could work: INET://192.168.x.x:3050/path_to_fdb
           ##
@@ -315,6 +324,12 @@ proc fbConnect*(dsn,user,pw:string,role:string="",fail:bool=true):PyObject =
           ##
           ## connection strings without quitting on connection failure.
           ## 
+          ## Generally we get best results with embedded or tcp connection
+          ##
+          ## INET may not work everywhere, default firebird port is 3050 and
+          ##
+          ## should not be closed or blocked by a firewall
+          ##
           try:          
             result = fdb.connect(dsn,user=user,password=pw,role=role) 
           except:
@@ -329,7 +344,7 @@ proc fbConnect*(dsn,user,pw:string,role:string="",fail:bool=true):PyObject =
                #parseFdbErrorMsg(getCurrentExceptionMsg())
                echo()
                if fail == true:  # this is the default setting, if fail = false we can skip
-                  doFinish()    # a failing connection and maybe try another one
+                  doFinish()     # a failing connection and maybe try another one
               
             
             
@@ -366,14 +381,14 @@ proc queryFields*(qstring:string):int =
              result = z4.len 
                                
      elif aqstring.startswith("select "):
-            var z0 = split(aqstring,"select ")
-            var z1 = z0[1].split("from")
-            var z2 = z1[0].split(",")
-            #for x in z2: echo x
-            result = z2.len             
+             var z0 = split(aqstring,"select ")
+             var z1 = z0[1].split("from")
+             var z2 = z1[0].split(",")
+             #for x in z2: echo x
+             result = z2.len             
      else:
-           printLnInfoMsg("Firebird","Not a select query ! Queryfieldscount not established",truetomato) 
-           result = -1
+             printLnInfoMsg("Firebird","Not a select query ! Queryfieldscount not established",truetomato) 
+             result = -1
                
                        
 proc fbquery*(acon:PyObject,qstring:string,raiseflag:bool = false):seq[string] {.discardable.} =   
@@ -511,9 +526,9 @@ proc createFbTable*(acon:PyObject,tabledata:string) =
         try: 
            discard acon.execute_immediate(tabledata) 
            discard acon.commit()
-           printLnInfoMsg("Table   ",cxPad("New table " & tn[0] & " created .    ",50),yellowgreen)
+           printLnInfoMsg("Table   ",cxPad(" New table " & tn[0] & " created .    ",50),yellowgreen)
            fbgrant(acon,"sysdba",tn[0],"all")
-           printLnInfoMsg("Firebird",cxPad("All granted to sysdba",50),pastelPink)
+           printLnInfoMsg("Firebird",cxPad(" All granted to sysdba",50),pastelPink)
            echo()
         except:
            printLnFailMsg("Creation of new table failed. Maybe existing.")  
@@ -621,7 +636,8 @@ proc getUsers*(host:string="localhost",user:string="sysdba", password:string = "
      ## for a simpler output use getSecUsers
      #
      decho(2)
-     cxprintln(1,plum,"Users registered in this server")
+     cxprintLn(1,cxfg(cxgrey0),cxbg(cxpink8),"[Firebird]",cxfg(cxgrey0),cxbg(cxindigo8),cxpad(" Registered Server Users " & host,53))
+     echo()
      let svc = fdb.connect_server(host,user=user, password = password)
      let ux = svc.user.get_all()
      var ux1 = ($ux).split("UserInfo(")
@@ -671,11 +687,11 @@ proc showTablesAndFields*(acon:PyObject) =
      ##
      ## displays tables and fields in connected database
      ##
-     cxprintLn(0,plum,"Table and Fields in Database")
+     cxprintLn(1,cxfg(cxgrey0),cxbg(cxpink8),"[Firebird]",cxfg(cxgrey0),cxbg(cxindigo8),cxpad(" Tables and Fields ",53))
      echo()
      let atf = alltables(acon)
      for x in 0 ..< atf.len:
-        printLnBiCol((cleanQdata(atf[x])).replace("\\L","").strip(true,true),colLeft=lime)
+        printLnBiCol((cleanQdata(atf[x])).replace("\\L","").strip(true,true),colLeft=cxfg(cxpurple3))
         let afi = strip(cleanQdata(atf[x]).replace("\\L",""),true,true)
         showQuery(allfields(acon,afi))
 
@@ -694,7 +710,8 @@ proc showAllViews*(acon:PyObject) =
      ## 
      ## shows views in the connected db
      ##
-     cxprintLn(0,plum,"Views in Database ")
+     cxprintLn(1,cxfg(cxgrey0),cxbg(cxpink8),"[Firebird]",cxfg(cxgrey0),cxbg(cxindigo8),cxpad(" Views in Database ",53))
+     echo()
      showQuery(allviews(acon))   
 
 proc getViews*(acon:PyObject):string = 
@@ -716,15 +733,18 @@ proc allGenerators*(acon:PyObject):seq[string] =
      result = fbquery(acon,"select rdb$generator_name from rdb$generators where rdb$system_flag is null")
      if result.len == 0:
         result = @["None"]
+        
           
 proc showAllGenerators*(acon:PyObject) =
      ## showAllGenerators
      ##
      ## shows generators in the connected db
      ##
-     cxprintLn(0,plum,"Generators in current Database ")
+     cxprintLn(1,cxfg(cxgrey0),cxbg(cxpink8),"[Firebird]",cxfg(cxgrey0),cxbg(cxindigo8),cxpad(" Generators in Database ",53))
+     echo()
      showQuery(allgenerators(acon))
      echo()   
+     
       
 proc getGenerators*(acon:PyObject):string = 
      ## getGenerators
@@ -750,14 +770,20 @@ proc showAllIndexes*(acon:PyObject) =
      ##
      ## displays indexes in database except primary keys
      ## 
-     cxprintLn(0,plum,"Indexes in database except primary keys ")
-     cxprintLn(0,dodgerblue,rightarrow & "  Name, UniqueFlag, Table, Field")
+     
+     cxprintLn(1,cxfg(cxgrey0),cxbg(cxpink8),"[Firebird]",cxfg(cxgrey0),cxbg(cxindigo8),cxpad(" Indexes in database except primary keys ",53))
+     echo()
+     cxprintLn(1,cxfg(cxyellow5),styleUnderScore,fmtx(["<35","<35","<35","<35"],"Name","UniqueFlag","Table","Field"))
      echo()
      var adx = allindexes(acon)
+     var n = 0
      for x in 0 ..< adx.len:
         let adx1 = strip((cleanQdata(adx[x])).replace("\\L",""),true,true).split(",")
         for y in adx1:
-           printBiCol(y.strip(true,true) & spaces(1))
+           if n == 0:
+               n=1
+           else: inc(n)      
+           print(cxfg(cxgreen3),cxpad(y.replace("'","").strip(true,true),35),xpos = (n * 35) - 34)
         echo()      
      echo()
      
@@ -785,8 +811,8 @@ proc showAllPrimarykeys*(acon:PyObject) =
      ##
      ## shows primary keys in the connected database
      ##
-     cxprintLn(0,plum,"Primary Keys in Database ")
-     printLn(rightarrow & "IndexName,\n Field",dodgerblue)
+     cxprintLn(1,cxfg(cxgrey0),cxbg(cxpink8),"[Firebird]",cxfg(cxgrey0),cxbg(cxindigo8),cxpad(" Primary keys in Database ",53))
+     printLn(rightarrow & "IndexName,\n Field",cxfg(cxblue7))
      let apk = allprimarykeys(acon)
      for x in 0 ..< apk.len:
         var apk1 = strip((cleanQdata(apk[x])).replace("\\L",""),true,true).split(",")
@@ -819,7 +845,8 @@ proc showCounts*(acon:PyObject) =
      ##
      ## displays rowcount data for tables of a connection
      ##  
-     cxprintLn(0,plum,"Row counts of each table in current database")
+     cxprintLn(1,cxfg(cxgrey0),cxbg(cxpink8),"[Firebird]",cxfg(cxgrey0),cxbg(cxindigo8),cxpad(" Row counts of each table in current database",53))
+
      echo()
      let qres = fbquery(acon,countall)
      printLn(fmtx(["<25","",""],"  Table"," : ","  RowCount  "),gold,xpos=1,styled={styleUnderScore})
@@ -838,7 +865,8 @@ proc showCursorInfo*(cur:PyObject) =
     ##
     ##  
     ##
-    cxprintLn(1,plum,"Cursor Description Information")
+    cxprintLn(1,cxfg(cxgrey0),cxbg(cxpink8),"[Firebird]",cxfg(cxgrey0),cxbg(cxindigo8),cxpad(" Cursor Description Information ",53))
+
     echo()
     for x in 0 ..< 1000: # assuming max 1000 fields ...
        try:  
@@ -890,9 +918,9 @@ proc addUser*(host:string="localhost",
         echo()
            
 proc deleteUser*(host:string="localhost",
-                adminuser:string="sysdba",
+                adminuser:string = "sysdba",
                 adminpw:string, 
-                username:string)=
+                username:string) =
             
             let svc = fdb.connect_server(host,user=adminuser, password=adminpw)
             var checkuser = svc.user.get(username)
@@ -915,7 +943,6 @@ proc modifyUser*(host:string="localhost",
              firstname:string="",
              middlename:string="",
              lastname:string="") =
-      
       
      let svc = fdb.connect_server(host,user=adminuser, password=adminpw)
      var checkuser = svc.user.get(username) 
@@ -947,9 +974,9 @@ proc fbGrant*(acon:PyObject,username:string,atable:string ,options:string) =
          try:
             discard acon.execute_immediate(grantstring) 
             discard acon.commit()
-            printLnInfoMsg("Firebird",cxpad(grantstring,60),pastelorange)
+            cxprintLn(1,cxfg(cxgrey0),cxbg(cxpink8),"[Firebird]",cxfg(cxgrey0),cxbg(cxgreen5),cxpad(grantstring,53))
          except:
-            printLnInfoMsg("Firebird",cxpad("Grant query failed",50),truetomato)
+            cxprintLn(1,cxfg(cxgrey0),cxbg(cxpink8),"[Firebird]",cxfg(cxgrey0),cxbg(cxred5),cxpad(" Grant query failed",53))
          echo()   
 
 proc fbRevoke*(acon:PyObject,username:string,atable:string ,options:string) =
@@ -968,9 +995,9 @@ proc fbRevoke*(acon:PyObject,username:string,atable:string ,options:string) =
          try:
             discard acon.execute_immediate(revokestring) 
             discard acon.commit()
-            printLnInfoMsg("Firebird",cxpad(revokestring,60),pastelorange)
+            cxprintLn(1,cxfg(cxgrey0),cxbg(cxpink8),"[Firebird]",cxfg(cxgrey0),cxbg(cxgreen5),cxpad(revokestring,53))
          except:
-            printLnInfoMsg("Firebird",cxpad("Revoke query failed",50),truetomato)
+             cxprintLn(1,cxfg(cxgrey0),cxbg(cxpink8),"[Firebird]",cxfg(cxgrey0),cxbg(cxred5),cxpad(" Revoke failed",53))
          echo()
     
     
@@ -988,23 +1015,25 @@ proc fbBackup*(database:string,backupfile:string,host:string="localhost",adminus
      ##  
      
      echo()
-     printLnInfoMsg("Firebird",cxpad("Backup started for  : " & database,50),colLeft=pastelyellowgreen)
+     cxprintLn(1,cxfg(cxgrey0),cxbg(cxpink8),"[Firebird]",cxfg(cxgrey0),cxbg(cxindigo8),cxpad(" Backup started for : " & database,53))
      var bk = execCmdEx("""gbak -b -V -se $1:service_mgr $3 $4 -user SYSDBA -password $2""" % [host,adminpw,database,backupfile])
      if $(bk.exitcode) <> "0":
          #service manager failed
-         printLnInfoMsg("Firebird","Backup without service_mgr",colLeft=pastelpink)
+         printLnInfoMsg("Firebird"," Backup without service_mgr",colLeft=pastelpink)
          var bks = """gbak -b -V $3  $4 -user SYSDBA -password $2""" % [host,adminpw,database,backupfile]
          #echo bks  #for debug
          bk = execCmdEx(bks)
          
      if fileExists(backupfile) == true and $(bk.exitcode) == "0":
-        var t1 = cxpad("Backup ok  -->  from : " & database,50)
-        var t2 = cxpad("           -->    to : " & backupfile,50)
-        printLnInfoMsg("Firebird",t1,colLeft=pastelOrange)
-        printLnInfoMsg("Firebird",t2,colLeft=pastelOrange)
+        var t1 = cxpad(" Backup ok --> from : " & database,50)
+        var t2 = cxpad("           -->   to : " & backupfile,50)
+        var t3 = cxpad(" Backup completed. Verify before use ",50)
+        cxprintLn(1,cxfg(cxgrey0),cxbg(cxpink8),"[Firebird]",cxfg(cxgrey0),cxbg(cxgreen6),cxpad(t1,53))
+        cxprintLn(1,cxfg(cxgrey0),cxbg(cxpink8),"[Firebird]",cxfg(cxgrey0),cxbg(cxgreen6),cxpad(t2,53))
+        cxprintLn(1,cxfg(cxgrey0),cxbg(cxpink8),"[Firebird]",cxfg(cxgrey0),cxbg(cxgreen6),cxpad(t3,53))
      else:
-        var t3 = cxpad("Backup failure.Check: " & backupfile,50)
-        printLnInfoMsg("Firebird ",t3,colLeft=truetomato)    
+        var t4 = cxpad(" Backup failure. ExitCode : " & $(bk.exitcode) & " Check: " & backupfile,50)
+        cxprintLn(1,cxfg(cxgrey0),cxbg(cxpink8),"[Firebird]",cxfg(cxgrey0),cxbg(cxred6),cxpad(t4,53)) 
      echo()
 
 
@@ -1021,23 +1050,23 @@ proc fbBackupRemoteToLocal*(host:string,database:string,backupfile:string,adminp
      ## fbBackupRemoteToLocal("192.168.1.123",myadminpass,"myremotepath/test.fdb","mylocalpath/test.fbk")
      ##
      echo()
-     printLnInfoMsg("Firebird",cxpad("Backup started for  : " & database,50),pastelyellowgreen)
+     cxprintLn(1,cxfg(cxgrey0),cxbg(cxpink8),"[Firebird]",cxfg(cxgrey0),cxbg(cxindigo8),cxpad(" Backup started for : " & database,53))
      var bk = execCmdEx("""gbak -b -se $1:service_mgr -user SYSDBA -pass $2  $3 stdout > $4""" % [host,adminpw,database,backupfile])
      if $(bk.exitcode) == "0":
-        printLnInfoMsg("Firebird","RemotetoLocal gbak backup status ok",pastelorange)
-        printLnInfoMsg("Firebird","Backupfile is : $1" % [backupfile],pastelorange) 
+        printLnInfoMsg("Firebird"," RemotetoLocal gbak backup status ok",pastelorange)
+        printLnInfoMsg("Firebird"," Backupfile is : $1" % [backupfile],pastelorange) 
      else:
        block:
          # this sometimes fails due to service_mgr issue , so we try this
-         printLnInfoMsg("Backup","RemoteToLocal backup without service_mgr")
+         printLnInfoMsg("Backup"," RemoteToLocal backup without service_mgr")
          var bks = """gbak -b -V $3  $4 -user SYSDBA -password $2""" % [host,adminpw,database,backupfile]
          echo bks
          var bk = execCmdEx(bks)
          #var bk = execCmdEx("""gbak -b -V $3  $4  -user SYSDBA -password $2""" % [host,adminpw,database,backupfile])
          if $(bk.exitcode) == "0":
-            printLnInfoMsg("Firebird","RemoteToLocal backup without service_mgr succeeded",pastelorange)
-            printLnInfoMsg("Firebird","RemoteToLocal gbak backup status ok",pastelorange)
-            printLnInfoMsg("Firebird","Backupfile is : $1" % [backupfile],pastelorange)    
+            printLnInfoMsg("Firebird"," RemoteToLocal backup without service_mgr succeeded",pastelorange)
+            printLnInfoMsg("Firebird"," RemoteToLocal gbak backup status ok",pastelorange)
+            printLnInfoMsg("Firebird"," Backupfile is : $1" % [backupfile],pastelorange)    
            
      
 proc fbRestoreLocalToRemote*(host:string,database:string,backupfile:string,adminpw:string = "")=
@@ -1064,13 +1093,13 @@ proc fbRestoreLocalToRemote*(host:string,database:string,backupfile:string,admin
              database.removeSuffix(".fdb")
              database = database & "-restored.fdb" # correct to the new name for our to be restored database
              
-     printLnInfoMsg("Firebird",cxpad("LocalToRemote restore started for : " & database,50),pastelyellowgreen)
+     printLnInfoMsg("Firebird",cxpad(" LocalToRemote restore started for : " & database,50),pastelyellowgreen)
      var rs = execCmdEx("""gbak -c -se $1:service_mgr -user SYSDBA -pass $2 stdin $3 < $4"""  % [host,adminpw,database,backupfile])
      if $(rs.exitcode) == "0":
-        printLnInfoMsg("Firebird","LocalToRemote gbak restore status ok",pastelorange)
-        printLnInfoMsg("Firebird","Restored to $1" % [database],pastelorange)  
+        printLnInfoMsg("Firebird"," LocalToRemote gbak restore status ok",pastelorange)
+        printLnInfoMsg("Firebird"," Restored to $1" % [database],pastelorange)  
      else: 
-        printLnInfoMsg("Firebird","LocalToRemote gbak restore status fail",truetomato)
+        printLnInfoMsg("Firebird"," LocalToRemote gbak restore status fail",truetomato)
  
       
 proc fbRestore*(backupfile:string,database:string,host:string="localhost",adminuser="sysdba",adminpw:string="",replace:bool = false,report:bool=false) =
@@ -1095,7 +1124,7 @@ proc fbRestore*(backupfile:string,database:string,host:string="localhost",adminu
      ##
      var restorestring = ""
      
-     printLnInfoMsg("Firebird",cxpad("Restore started for : " & database,50),pastelyellowgreen)
+     cxprintLn(1,cxfg(cxgrey0),cxbg(cxpink8),"[Firebird]",cxfg(cxgrey0),cxbg(cxindigo8),cxpad(" Restore started for : " & database,53))
      if replace == false:
          # this will throw an error if database already exists
          #restorestring = "gbak -c $1  $2 -V" % [backupfile,database]  # verbose
@@ -1106,7 +1135,7 @@ proc fbRestore*(backupfile:string,database:string,host:string="localhost",adminu
          if fileExists(database):
              # while it works maybe we should not use cxZYesNo here to keep it more pure
              # var yn = cxZYesNo("Replace existing file :\L\L$1 " % database) # a zenity messagebox
-             let yn = cxinput("\L" & plum & "Replace existing file :\L" & yellowgreen & "  $1\L" % [database] & plum & "[yes/no] : " )
+             let yn = cxinput("\L" & plum & " Replace existing file :\L" & yellowgreen & "  $1\L" % [database] & plum & "[yes/no] : " )
              decho(2)
              if tolowerAscii(yn) == "yes" or tolowerAscii(yn) == "y":
                   #ok
@@ -1116,7 +1145,7 @@ proc fbRestore*(backupfile:string,database:string,host:string="localhost",adminu
                   #restorestring = "gbak -c -se -R $1:service_mgr $2 $1:$3 -user SYSDBA -pass $4" % [host,backupfile,database,adminpw]
              else:
                   restorestring = ""
-                  printLnInfoMsg("Firebird",cxpad("Nothing will be restored",50),truetomato)
+                  cxprintLn(1,cxfg(cxgrey0),cxbg(cxpink8),"[Firebird]",cxfg(cxgrey0),cxbg(cxred5),cxpad(" Nothing will be restored for : " & database,53))
          else:
              #if databasefile is not existing we simply restore
              #restorestring = "gbak -c $1  $2 -V" % [backupfile, database] # verbose
@@ -1125,21 +1154,21 @@ proc fbRestore*(backupfile:string,database:string,host:string="localhost",adminu
                               
      if restorestring.len > 0:
         if report == true: 
-         cxprintLn(1,dodgerblue,"Restore Report for $1 " % database)
+         cxprintLn(1,cxfg(cxgrey0),cxbg(cxpink8),"[Firebird]",cxfg(cxgrey0),cxbg(cxindigo8),cxpad(" Restore Report for $1 " % database,53))
          cxprintLn(1,restorestring)
         var restoreres = execCmdEx(restorestring)
         if report == true:
          for line in restoreres.output.splitLines():                 
             cxprintLn(1,dodgerblue,line)
         if restoreres.exitCode == 0:
-            printLnInfoMsg("Firebird",cxpad("Restored   -->  from : " & backupfile ,50),pastelorange)
-            printLnInfoMsg("Firebird",cxpad("           -->    to : " & database,50),pastelorange)
+            printLnInfoMsg("Firebird",cxpad(" Restored   -->  from : " & backupfile ,50),pastelorange)
+            printLnInfoMsg("Firebird",cxpad("            -->    to : " & database,50),pastelorange)
         else:
-            printLnInfoMsg("Firebird",cxpad("Restore Alert -> gbak exitcode : " & $(restoreres.exitCode),50),truetomato)
-            printLnInfoMsg("Firebird",cxpad("gbak output                    : " & $restoreres,50),pastelOrange)
+            printLnInfoMsg("Firebird",cxpad(" Restore Alert -> gbak exitcode : " & $(restoreres.exitCode),50),truetomato)
+            printLnInfoMsg("Firebird",cxpad(" gbak output                    : " & $restoreres,50),pastelOrange)
      else:
-         printLnInfoMsg("Firebird",cxpad("Nothing Restored",50),truetomato)
-
+        cxprintLn(1,cxfg(cxgrey0),cxbg(cxpink8),"[Firebird]",cxfg(cxgrey0),cxbg(cxred5),cxpad(" Nothing restored as instructed ",53))
+     echo()
 
 proc dropDatabase*(database:string,auser:string,auserpw:string) =
     ## dropDatabase
@@ -1154,22 +1183,68 @@ proc dropDatabase*(database:string,auser:string,auserpw:string) =
     try:
       if fileExists(database):
          # to drop database we need to connect first
-         printLnInfoMsg("Firebird",cxpad("Trying to drop Database " &  database,50),pastelorange)
+         cxprintLn(1,cxfg(cxgrey0),cxbg(cxpink8),"[Firebird]",cxfg(cxgrey0),cxbg(cxorange6),cxpad(" Trying to drop Database " &  database,53))
          let newcon = fbconnect(database,auser,auserpw)
          discard newcon.drop_database()
          discard newcon.close()
-         printLnInfoMsg("Firebird",cxpad("Dropped Database : " & database,50),pastelorange)
+         cxprintLn(1,cxfg(cxgrey0),cxbg(cxpink8),"[Firebird]",cxfg(cxgrey0),cxbg(cxgreen6),cxpad("Dropped Database " &  database,53))
     except:
          printLnInfoMsg("Firebird","Database : " & database  & " could not be dropped ",truetomato)
+         cxprintLn(1,cxfg(cxgrey0),cxbg(cxpink8),"[Firebird]",cxfg(cxgrey0),cxbg(cxred6)," Database : " & database  & " could not be dropped ")
+    echo()
  
+proc showServerDay*(acon:PyObject) =
+   cxprintLn(1,cxfg(cxgrey0),cxbg(cxpink8),"[Firebird]",cxfg(cxgrey0),cxbg(cxindigo8),cxpad(" Server Date ",53))
+   var sdate = parseDatetime(showQuery(fbquery(acon,currentday),printit=false)[0]) 
+   sdate=sdate.replace(",","-")
+   cxprintLn(1,sdate)
+   
+proc showServerTime*(acon:PyObject) =
+   echo()
+   
+   cxprintLn(1,cxfg(cxgrey0),cxbg(cxpink8),"[Firebird]",cxfg(cxgrey0),cxbg(cxindigo8),cxpad(" Server Time ",53))
+   try:
+       let stime = parseDatetime(showQuery(fbquery(acon,currenttime),printit=false)[0]) 
+       var sstime = $stime
+       sstime.removePrefix("(,")
+       sstime=sstime.replace(",","-")
+       # now to parse this we need to find the third hypen and change to space
+       # any other hypen change to :  and eventually remove the millisecs
+       var hycount = 0
+       for v in 0 ..< sstime.len:
+         if sstime[v] == '-':
+             inc(hycount)
+             if hycount == 3:
+                 sstime[v] = ' '
+             elif hycount > 3:
+                 sstime[v] = ':'
+                      
+       cxprintLn(1,sstime)   
+   except:
+       cxprintLn(1,"Servertime not available") 
+   echo()
+    
 proc shutdown*(acon:PyObject,aconName:string="") =    
     ## shutdown
     ##
     ## close a connection and show status
     ##
+    cxprintLn(1,cxfg(cxgrey0),cxbg(cxpink8),"[Firebird]",cxfg(cxgrey0),cxbg(cxteal8),cxpad(" Connection Shutdown Initiated",53))
     fbdisconnect(acon)
     showConStatus(acon,"acon")
     echo() 
+ 
+ 
+proc connect*(dsn:string,pwd:string):PyObject = 
+        if pwd == "":
+            printlnAlertMsg(" 登录失败，凭证不被接受！No Password specified ")
+            printLnAlertMsg(" Closing down now . Error : Login Failure!     ")
+            doFinish()             
+        else:
+            result = fbconnect(dsn,"sysdba",pwd) 
+
+decho(2) 
+ 
  
 when isMainModule:
     import nimcx/cxzenity
@@ -1182,29 +1257,38 @@ when isMainModule:
     # setup
     let logon = cxZLoginDialog()  # get the user/password via cxzenity first
     let user = logon.name          
-    let pwx = logon.password   
+    let pwx = logon.password  
     
+       
     # change to wherever the fbtest30.fdb file lives   
-    let dbpath  = "Downloads/python3-driver/test/fbtest30.fdb"          # original db
-    let dbpathk = "Downloads/python3-driver/test/fbtest30.fbk"          # backedup db
-    let dbpathr = "Downloads/python3-driver/test/fbtest30-restored.fdb" # restored db
+    let dbpath  = "data5/dbmaster/fbtest40.fdb"          # original db
+    let dbpathk = "data5/dbmaster/fbtest40.fbk"          # backedup db
+    let dbpathr = "data5/dbmaster/fbtest40-restored.fdb" # restored db
     
     #note that permissions must be correct so usually you want
     #to have the .fdb files be part of the firebird group
-    let testdb = "inet://" & getHomeDir() & dbpath
+    #let testdb = "inet://" & getHomeDir() & dbpath
+    #let testdb = localip()[1] & ":" & dbpath
+    let testdb = getHomeDir() & dbpath  # for some reason tcp conn not ok embedded ok
+    if fileExists(testdb):
+        printLnInfoMsg("Database" , testdb & " found ")
+    else:
+        printLnAlertMsg("Database" & testdb & " not found ")
     # below used in backup gbak utility works only local
     let testdbflocal = getHomeDir() & dbpath
     if not fileExists(testdbflocal):
-         printLnAlertMsg("Database " & testdbflocal & " not found ")
+         printLnAlertMsg("Database" & testdbflocal & " not found ")
          doByeBye()
-    
+    else:
+         printLnInfoMsg("Database",testdbflocal & " found ")
     #remote connection path example to some database on a remote server ok
-    #let testdb = "192.168.1.109/3050:/home/blaah/Downloads/python3-driver/test/fbtest30.fdb" 
+    #let testdb = "192.168.1.109/3050:/home/blaah/Downloads/python3-driver/test/fbtest40.fdb" 
 
     # show serverinfo
-    showServerInfo(password=pwx)  # may crash if the user has no admin rights
+    #showServerInfo(password=pwx)  # may crash if the user has no admin rights
         
-    var acon = fbconnect(dsn=testdb,user=user,pw=pwx)   # connect to the database
+    var acon = connect(testdb,pwd=pwx)   # connect to the database
+    showConStatus(acon,"acon")
     echo()
     
     cxprintln(0,plum,"Show information based on connection to a database")
@@ -1227,17 +1311,10 @@ when isMainModule:
     showQuery(fbquery(acon,isolevel))
     echo()
     
-    cxprintLn(0,plum,"ServerTime  :")
-    let st = showQuery(fbquery(acon,servertime),false)
-    # still remove some artifacts
-    var sts = st[0].replace("(,","")
-    sts.removesuffix(",")
-    echo sts
-    echo()
-    
+       
     cxprintLn(0,plum,"CurrentTime :")
     var ct = showQuery(fbquery(acon,currenttime),false)
-    var cts = st[0].replace("(,","")
+    var cts = ct[0].replace("(,","")
     cts.removesuffix(",")
     echo cts
     echo()
@@ -1275,7 +1352,7 @@ when isMainModule:
     
     deleteUser(adminpw=pwx,username="JOHN2020")
     
-    modifyUser(adminpw=pwx,username="JOHN4",firstname="Franky",userpassword="JOHN4")
+    modifyUser(adminpw=pwx,username="JOHN4",firstname="SuckingFranky",userpassword="JOHN4")
     
     cxprintLn(1,plum,"Current Users Full Details after delete:")
     getusers(password = pwx)
@@ -1293,22 +1370,31 @@ when isMainModule:
         discard
        
     echo()    
-    cxprintLn(1,plum,"Trying to run a backup/restore via gbak   ")
-    
+        
     # fbbackup/fbrestore ok
     fbBackup(testdbflocal,getHomeDir() & dbpathk,adminpw=pwx) 
         
     cxprintLn(1,plum,"Restoring with rep switch is true so a older restore will be replaced") 
+    cxprintLn(1,plum,"Select no for testing as newly restored file needs manual permission change for sec reasons")
     fbRestore(getHomeDir() & dbpathk,
               getHomeDir() & dbpathr,
               adminpw=pwx,
               replace=true) 
-    echo()              
-    cxprintLn(1,plum,"Connecting to the restored file")
-    acon = fbconnect(dsn=getHomeDir() & dbpathr,user=user,pw=pwx)
-    showConStatus(acon,"acon")
+    echo() 
+                 
+    cxprintLn(1,plum,"Connecting to the restored file now may fail because of file permissions   ")
+    cxprintLn(1,plum,"may not be set correctly on the newly restored file for security reasons   ")
+    cxprintLn(1,plum,"Set fbtest40-restored.fdb permissions and rerun selecting No when prompted ")
+    try:
+      acon = fbconnect(dsn=getHomeDir() & dbpathr,user=user,pw=pwx)
+    except:
+      # we do not reach here because exception already triggered in python3  
+      showConStatus(acon,"acon")
+      doByeBye() 
     
-    cxprintln(0,plum,"Query outputs from restored database")
+    showConStatus(acon,"acon")  
+      
+    cxprintln(1,yellow,"Query outputs from now connected fbtest40-restored.fdb")
     echo()
     
     cxprintLn(1,plum,"Example of a prepared cursor and how to get the data")
@@ -1334,9 +1420,11 @@ when isMainModule:
     showCursorInfo(cur.execute("select * from country"))
     echo()
         
-    showConStatus(acon,"acon")  
-    cxprintLn(1,plum,"shutdown the acon connection ")
+    showConStatus(acon,"acon")  # before shutdown
     shutdown(acon,"acon")
+    
+    cxprintLn(1,yellow,"Finished testing for nimfdb  - the Nim driver around the python firebird-driver")
+    
     doFinish()
                      
 # end of nimfdb.nim 

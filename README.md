@@ -1,10 +1,11 @@
 # nimfdb   -  Firebird
 
 
-Access Firebird databases with Nim utilizing the new python firebird-driver
+Firebird database driver for Nim 
+with help from the official python firebird-driver and nimpy
 
 
-Work in progress .... tested on Linux only
+Linux only
 
 
 Requirements
@@ -12,13 +13,14 @@ Requirements
 
  - latest Nim , tested mainly against the current devel version
  - python3.8.x or python3.9.x
- - a Firebird3 server installation from your distro
+ - a Firebird3 or firebird4 server installation from your distro
+   or see [firebird](https://firebirdsql.org/en/firebird-4-0-1/)
  
 Notes 
 ------------------- 
- - our test firebird database has abt 7 million rows of [tatoeba](https://tatoeba.org/eng/) sentences
+ - Tested on a firebird database with abt 7 million rows of [tatoeba](https://tatoeba.org/eng/) sentences
 
-   and a tatoeba links table with abt 17 million rows. The Firebird Server runs on a Raspberry 4
+   with a tatoeba links table which has abt 17 million rows. The Firebird Server lives on a Raspberry 4 8GB
 
    with Ubuntu 20.4 LTS.  
   
@@ -29,7 +31,7 @@ Installation
  - nimble install nimcx
  - nimble install nimpy
  - nimble install https://github.com/qqtop/nimfdb 
- 
+ - some test programs benefit from zenity , nimcx has a cxzenity module available
 
 Functions Overview
 -------------------
@@ -93,10 +95,8 @@ Functions Overview
 
 
 Main functions work fine , some of the administration functions
-need more testing as the underlying python api is still in flux.
-Advanced management utility functions still need more testing .
+need more testing against the underlying python api.
 Connections via embedded or tcp tested ok.
-
 
 
 
@@ -110,10 +110,13 @@ For intensive administration use [Flamerobin](https://github.com/mariuz/flamerob
 
 Learn about the [Firebird Project](https://www.firebirdsql.org/en/start/)
 
+Read the [Firebird News](https://www.firebirdnews.org/)
+
+Thank You for [Nimpy](https://github.com/yglukhov/nimpy)
 
 
 ![Image](http://qqtop.github.io/qqtop1.png?raw=true)
 
-Jan 2021
+January 2022
 
 
