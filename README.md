@@ -20,9 +20,9 @@ Notes
 ------------------- 
  - Tested on a firebird database with abt 7 million rows of [tatoeba](https://tatoeba.org/eng/) sentences
 
-   with a tatoeba links table which has abt 17 million rows. The Firebird Server lives on a Raspberry 4 8GB
-
-   with Ubuntu 20.4 LTS.  
+   with a tatoeba links table which has abt 17 million rows. 
+   
+   The Firebird 4.0  Server lives on a Raspberry 4 8GB  with Ubuntu 20.4 LTS.  
   
 
 Installation
